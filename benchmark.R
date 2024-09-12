@@ -45,7 +45,7 @@ bmr <- mlr3batchmark::reduceResultsBatchmark(findDone(), store_backends = FALSE)
 
 measure <- msr("regr.mse", id = "mse")
 scores <- bmr$score(measure, conditions = TRUE)
-aggr <- bmr$aggregate(measure, conditions = FALSE)
+aggr <- bmr$aggregate(measure, conditions = TRUE)
 
 
 if (!fs::dir_exists(fs::path_dir(conf$result_path))) {
