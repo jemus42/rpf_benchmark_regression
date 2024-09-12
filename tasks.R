@@ -61,12 +61,15 @@ task_meta[, dim_rank := rank(dim)]
 # Resampling ----------------------------------------------------------------------------------
 
 if (conf$resampling$outer$strategy == "OML") {
+  cli::cli_alert_info("Using OML resamplings")
   resamplings = lapply(omltasks, \(task) as_resampling(task))
   # Discard resamplings for tasks with missing values
   resamplings <- resamplings[tasks_keep_ids]
 
 } else {
   set.seed(conf$seed)
+
+  cli::cli_alert_info("Creating {.val {conf$resampling$outer$strategy}} resamplings")
 
   resamplings = lapply(tasks, \(task) {
     cli::cli_alert_info("Making resampling for {task$id}")
