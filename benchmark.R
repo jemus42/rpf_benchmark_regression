@@ -35,7 +35,7 @@ mlr3batchmark::batchmark(design, store_models = FALSE)
 tab <- ljoin(unwrap(getJobTable()), task_meta, by = "task_id")
 data.table::setkey(tab, job.id)
 
-sample_ids = tab[dim_rank <= 5, .SD[sample(nrow(.SD), 1)], by = c("task_id", "learner_id")]
+sample_ids = tab[, .SD[sample(nrow(.SD), 1)], by = c("task_id", "learner_id")]
 # sample_ids
 
 submitJobs(sample_ids)
