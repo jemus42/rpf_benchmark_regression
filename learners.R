@@ -148,6 +148,10 @@ learners <- list(
       # replace = p_lgl()
     )
   )
+
+  ,
+
+  featureless = lrn("regr.featureless")
 )
 
 # Use list names for learner ids for convenience downstream
