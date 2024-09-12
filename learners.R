@@ -1,23 +1,26 @@
-
-requireNamespace("xgboost")
-requireNamespace("randomPlantedForest")
-requireNamespace("ranger")
-
+if (FALSE) {
+  # Packages required but not automatically picked up by renv
+  requireNamespace("xgboost")
+  requireNamespace("randomPlantedForest")
+  requireNamespace("ranger")
+  requireNamespace("callr") # For encapsulation
+}
 
 checkmate::assert_subset(conf$tuning$tuner, choices = c("random_search", "mbo"))
 
 if (conf$tuning$tuner == "mbo") {
   library(mlr3mbo)
-  requireNamespace("DiceKriging")
-  requireNamespace("rgenoud")
-}
 
+  if (FALSE) {
+    requireNamespace("DiceKriging")
+    requireNamespace("rgenoud")
+  }
+}
 
 wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
   paradox::assert_param_set(search_space)
 
   base_learner <- lrn(learner_id, ...)
-
 
   if (.encode) {
     base_learner <- po("encode", method = "treatment") %>>%
@@ -26,7 +29,15 @@ wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
       as_learner()
   }
 
+  # Used for XGBoost learners to enable internal tuning / early stopping using test set
+  if ("validation" %in% base_learner$properties) {
+    cli::cli_alert_info("Setting validation for {.val {learner_id}}")
+    set_validate(base_learner, "test")
+  }
+
+
   if (conf$fallback$inner) {
+    # base_learner$encapuslation("callr", lrn("regr.featureless"))
     base_learner$fallback = lrn("regr.featureless")
     base_learner$encapsulate = c(train = "callr", predict = "callr")
   }
@@ -57,17 +68,13 @@ wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
   )
 
   if (conf$fallback$outer) {
+    # at$encapuslation("callr", lrn("regr.featureless"))
     at$fallback = lrn("regr.featureless")
     at$encapsulate = c(train = "callr", predict = "callr")
   }
 
   at$timeout = c(train   = conf$timeout$autotuner$train  * 3600,
                  predict = conf$timeout$autotuner$predict * 3600)
-
-  # Used for XGBoost learners to enable internal tuning / early stopping using test set
-  if ("validation" %in% base_learner$properties) {
-    set_validate(base_learner, "test")
-  }
 
   at
 
@@ -80,7 +87,7 @@ learners <- list(
     ntrees = 50,
     max_interaction_limit = 20,
     search_space = ps(
-      maxintratio = p_dbl(0, 1),
+      max_interaction_ratio = p_dbl(0, 1),
       splits    = p_int(10, 100),
       split_try = p_int(1, 20),
       t_try     = p_dbl(0.1, 1)
