@@ -41,11 +41,19 @@ sample_ids = tab[dim_rank <= 5, .SD[sample(nrow(.SD), 1)], by = c("task_id", "le
 submitJobs(sample_ids)
 waitForJobs()
 
+cli::cli_alert_info("Reducing results")
 bmr <- mlr3batchmark::reduceResultsBatchmark(findDone(), store_backends = FALSE)
 
-measure <- msr("regr.mse", id = "mse")
-scores <- bmr$score(measure, conditions = TRUE)
-aggr <- bmr$aggregate(measure, conditions = TRUE)
+measures <- list(
+  msr("regr.rmse", id = "rmse"),
+  msr("regr.mae", id = "mae"),
+  msr("regr.rmsle", id = "rmsle")
+)
+
+cli::cli_alert_info("Scoring results")
+scores <- bmr$score(measures, conditions = TRUE)
+cli::cli_alert_info("Aggregating results")
+aggr <- bmr$aggregate(measures, conditions = TRUE)
 
 
 if (!fs::dir_exists(fs::path_dir(conf$result_path))) {
@@ -56,6 +64,7 @@ if (!fs::dir_exists(conf$result_path)) {
   fs::dir_create(conf$result_path)
 }
 
+cli::cli_alert_info("Saving results")
 saveRDS(bmr, fs::path(conf$result_path, "bmr", ext = "rds"))
 saveRDS(scores, fs::path(conf$result_path, "scores", ext = "rds"))
 saveRDS(aggr, fs::path(conf$result_path, "aggr", ext = "rds"))
