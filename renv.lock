@@ -183,7 +183,7 @@
     },
     "bbotk": {
       "Package": "bbotk",
-      "Version": "1.0.1",
+      "Version": "1.1.0",
       "Source": "Repository",
       "Repository": "CRAN",
       "Requirements": [
@@ -196,7 +196,7 @@
         "mlr3misc",
         "paradox"
       ],
-      "Hash": "e6af9db7df50c2a121be237171e5c0c9"
+      "Hash": "f567c7620152fc38663112b851a5c761"
     },
     "bit": {
       "Package": "bit",
@@ -228,6 +228,19 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "8f4a384e19dccd8c65356dc096847b76"
+    },
+    "callr": {
+      "Package": "callr",
+      "Version": "3.7.6",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "R6",
+        "processx",
+        "utils"
+      ],
+      "Hash": "d7e13f49c19103ece9e58ad2d83a7354"
     },
     "checkmate": {
       "Package": "checkmate",
@@ -760,14 +773,9 @@
     },
     "mlr3": {
       "Package": "mlr3",
-      "Version": "0.20.2.9000",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteUsername": "mlr-org",
-      "RemoteRepo": "mlr3",
-      "RemoteRef": "main",
-      "RemoteSha": "6f032fe21cdbd36543eb851925c5464968352e3a",
+      "Version": "0.20.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
       "Requirements": [
         "R",
         "R6",
@@ -786,7 +794,7 @@
         "parallelly",
         "uuid"
       ],
-      "Hash": "d7587c22e00da014fb86df3865713cf7"
+      "Hash": "2e5225a210cef7155a2899a4d16f1cf2"
     },
     "mlr3batchmark": {
       "Package": "mlr3batchmark",
@@ -1254,6 +1262,19 @@
       ],
       "Hash": "6b01fc98b1e86c4f705ce9dcfd2f57c7"
     },
+    "processx": {
+      "Package": "processx",
+      "Version": "3.8.4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "R6",
+        "ps",
+        "utils"
+      ],
+      "Hash": "0c90a7d71988856bad2a2a45dd871bb9"
+    },
     "progress": {
       "Package": "progress",
       "Version": "1.2.3",
@@ -1267,6 +1288,17 @@
         "prettyunits"
       ],
       "Hash": "f4625e061cb2865f111b47ff163a5ca6"
+    },
+    "ps": {
+      "Package": "ps",
+      "Version": "1.7.7",
+      "Source": "Repository",
+      "Repository": "https://packagemanager.posit.co/cran/latest",
+      "Requirements": [
+        "R",
+        "utils"
+      ],
+      "Hash": "878b467580097e9c383acbb16adab57a"
     },
     "qs": {
       "Package": "qs",
