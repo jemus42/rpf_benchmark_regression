@@ -37,13 +37,13 @@ trial:
   reg_name: "trial"
   resampling:
     inner:
-      strategy: "holdout"
+      strategy: "repeated_cv"
       folds: 3
       repeats: 2
     outer:
       strategy: "OML" # "OML" uses existing resamplings, otherwise creat enew mlr3 resampling
-      folds: 3
-      repeats: 2
+      # folds: 3
+      # repeats: 2
   tuning:
     # budget = evals + n_params * multiplier
     evals: 10
@@ -51,5 +51,5 @@ trial:
     runtime: !expr 24 * 60 * 60 # expected in seconds
     tuner: "mbo"
   fallback:
-    inner: false
-    outer: false
+    inner: true
+    outer: true
