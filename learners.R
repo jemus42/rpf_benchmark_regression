@@ -1,0 +1,148 @@
+
+requireNamespace("xgboost")
+requireNamespace("randomPlantedForest")
+requireNamespace("ranger")
+
+
+checkmate::assert_subset(conf$tuning$tuner, choices = c("random_search", "mbo"))
+
+if (conf$tuning$tuner == "mbo") {
+  library(mlr3mbo)
+  requireNamespace("DiceKriging")
+  requireNamespace("rgenoud")
+}
+
+
+wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
+  paradox::assert_param_set(search_space)
+
+  base_learner <- lrn(learner_id, ...)
+
+
+  if (.encode) {
+    base_learner <- po("encode", method = "treatment") %>>%
+      po("removeconstants") %>>%
+      base_learner |>
+      as_learner()
+  }
+
+  if (conf$fallback$inner) {
+    base_learner$fallback = lrn("regr.featureless")
+    base_learner$encapsulate = c(train = "callr", predict = "callr")
+  }
+
+  base_learner$timeout = c(train   = conf$timeout$base$train  * 3600,
+                           predict = conf$timeout$base$predict * 3600)
+
+  at <- auto_tuner(
+    learner = base_learner,
+    resampling = switch(
+      conf$resampling$inner$strategy,
+      "holdout"     = rsmp("holdout"),
+      "cv"          = rsmp("cv", folds = conf$resampling$inner$folds),
+      "repeated_cv" = rsmp("repeated_cv",
+                           folds = conf$resampling$inner$folds,
+                           repeats = conf$resampling$inner$repeats),
+    ),
+    measure = msr("regr.mse"),
+    search_space = search_space,
+    terminator = trm("combo", list(
+      trm("run_time", secs = conf$tuning$runtime),
+      trm("evals", n_evals = conf$tuning$evals, k = conf$tuning$multiplier)
+    ), any = TRUE),
+    tuner = tnr(conf$tuning$tuner),
+    store_tuning_instance = TRUE,
+    store_benchmark_result = FALSE,
+    store_models = FALSE
+  )
+
+  if (conf$fallback$outer) {
+    at$fallback = lrn("regr.featureless")
+    at$encapsulate = c(train = "callr", predict = "callr")
+  }
+
+  at$timeout = c(train   = conf$timeout$autotuner$train  * 3600,
+                 predict = conf$timeout$autotuner$predict * 3600)
+
+  # Used for XGBoost learners to enable internal tuning / early stopping using test set
+  if ("validation" %in% base_learner$properties) {
+    set_validate(base_learner, "test")
+  }
+
+  at
+
+}
+
+learners <- list(
+
+  rpf = wrap_autotuner(
+    learner_id = "regr.rpf",
+    ntrees = 50,
+    max_interaction_limit = 20,
+    search_space = ps(
+      maxintratio = p_dbl(0, 1),
+      splits    = p_int(10, 100),
+      split_try = p_int(1, 20),
+      t_try     = p_dbl(0.1, 1)
+    )
+  )
+
+  ,
+
+  rpf_fixdepth = wrap_autotuner(
+    learner_id = "regr.rpf",
+    ntrees = 50,
+    max_interaction = 2,
+    search_space = ps(
+      splits    = p_int(10, 100),
+      split_try = p_int(1, 20),
+      t_try     = p_dbl(0.1, 1)
+    )
+  )
+
+  ,
+
+  xgb = wrap_autotuner(
+    learner_id = "regr.xgboost", early_stopping_rounds = 50,
+    .encode = TRUE,
+    search_space = ps(
+      regr.xgboost.max_depth        = p_int(1, 20),
+      regr.xgboost.subsample        = p_dbl(0.1, 1),
+      regr.xgboost.colsample_bytree = p_dbl(0.1, 1),
+      regr.xgboost.eta              = p_dbl(1e-4, 1, logscale = TRUE),
+      regr.xgboost.nrounds          = p_int(upper = 5000, tags = "internal_tuning",
+                                            aggr = function(x) as.integer(mean(unlist(x))))
+    )
+  )
+
+  ,
+
+  xgb_fixdepth = wrap_autotuner(
+    learner_id = "regr.xgboost", max_depth = 2, early_stopping_rounds = 50,
+    .encode = TRUE,
+    search_space = ps(
+      regr.xgboost.max_depth        = p_int(1, 20),
+      regr.xgboost.subsample        = p_dbl(0.1, 1),
+      regr.xgboost.colsample_bytree = p_dbl(0.1, 1),
+      regr.xgboost.eta              = p_dbl(1e-4, 1, logscale = TRUE),
+      regr.xgboost.nrounds          = p_int(upper = 5000, tags = "internal_tuning",
+                                            aggr = function(x) as.integer(mean(unlist(x))))
+    )
+  )
+
+  ,
+
+  ranger = wrap_autotuner(
+    learner_id = "regr.ranger", num.trees = 50,
+    search_space = ps(
+      mtry.ratio      = p_dbl(0.1, 1),
+      min.node.size   = p_int(1, 50),
+      sample.fraction = p_dbl(0.1, 1)
+      # replace = p_lgl()
+    )
+  )
+)
+
+# Use list names for learner ids for convenience downstream
+mlr3misc::imap(learners, function(l, id) l$id = id)
+

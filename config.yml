@@ -1,0 +1,55 @@
+# Default config: Should become production mode
+default:
+  reg_name: "default"
+  reg_dir: !expr here::here("registries", reg_name)
+  result_path: !expr here::here("results", reg_name)
+  seed: 2024
+  resampling:
+    inner:
+      strategy: "cv"
+      folds: 3
+      repeats: 2
+    outer:
+      strategy: "OML" # "OML" uses existing resamplings, otherwise creat enew mlr3 resampling
+      folds: 3
+      repeats: 2
+  tuning:
+    # budget = evals + n_params * multiplier
+    evals: 200
+    multiplier: 0
+    runtime: !expr 24 * 60 * 60 # expected in seconds
+    tuner: "mbo"
+  fallback:
+    inner: true
+    outer: true
+  timeout:
+    base:
+      train: 12
+      predict: 4
+    autotuner:
+      train: 150
+      predict: 12
+
+production:
+  reg_name: "production"
+
+trial:
+  reg_name: "trial"
+  resampling:
+    inner:
+      strategy: "holdout"
+      folds: 3
+      repeats: 2
+    outer:
+      strategy: "OML" # "OML" uses existing resamplings, otherwise creat enew mlr3 resampling
+      folds: 3
+      repeats: 2
+  tuning:
+    # budget = evals + n_params * multiplier
+    evals: 10
+    multiplier: 0
+    runtime: !expr 24 * 60 * 60 # expected in seconds
+    tuner: "mbo"
+  fallback:
+    inner: false
+    outer: false
