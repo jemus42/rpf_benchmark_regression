@@ -1,8 +1,8 @@
+library(mlr3)
 library(mlr3oml)
-requireNamespace("qs")
-options(mlr3oml.cache = TRUE)
+requireNamespace("qs") # for caching
 
-
+cli::cli_h2("Creating tasks")
 # Gets the OpenML-CTR23 collection
 # https://www.openml.org/search?type=study&study_type=task&sort=tasks_included&id=353
 # https://openreview.net/pdf?id=HebAOoMm94
@@ -52,13 +52,15 @@ cli::cli_ul(tasks_exclude)
 
 tasks_keep_ids <- which(!names(tasks) %in% tasks_exclude)
 tasks <- tasks[tasks_keep_ids]
+task_meta <- task_meta[tasks_keep_ids]
+task_meta[, dim_rank := rank(dim)]
 
 cli::cli_alert_info("{.val {length(tasks)}} tasks remaining")
 
-task_meta[, dim_rank := rank(dim)]
 
 
 # Resampling ----------------------------------------------------------------------------------
+cli::cli_h2("Creating resamplings")
 
 if (conf$resampling$outer$strategy == "OML") {
   cli::cli_alert_info("Using OML resamplings")
@@ -72,15 +74,30 @@ if (conf$resampling$outer$strategy == "OML") {
   cli::cli_alert_info("Creating {.val {conf$resampling$outer$strategy}} resamplings")
 
   resamplings = lapply(tasks, \(task) {
-    cli::cli_alert_info("Making resampling for {task$id}")
-    switch(
+    # cli::cli_alert_info("Making resampling for {task$id}")
+    resampling <- switch(
       conf$resampling$outer$strategy,
       "cv" = rsmp("cv", folds = conf$resampling$outer$folds),
       "repeated_cv" = rsmp("repeated_cv",
                            folds = conf$resampling$outer$folds,
-                           repeats = conf$resampling$outer$repeats),
+                           repeats = conf$resampling$outer$repeats)
     )
+    resampling$instantiate(task)
+
+    resampling_dir <- here::here("resamplings", conf$resampling$outer$strategy)
+    if (!fs::dir_exists(resampling_dir)) {
+      fs::dir_create(resampling_dir, recurse = TRUE)
+    }
+
+    data.table::fwrite(
+      x = as.data.table(resampling),
+      file = fs::path(resampling_dir, task$id, ext = "csv")
+    )
+
+    resampling
   })
 }
 
 stopifnot(length(tasks) == length(resamplings))
+
+saveRDS(task_meta, "task_meta.rds")

@@ -23,6 +23,7 @@ default:
     inner: true
     outer: true
   timeout:
+    # provided in hours here
     base:
       train: 12
       predict: 4
@@ -46,10 +47,10 @@ trial:
       # repeats: 2
   tuning:
     # budget = evals + n_params * multiplier
-    evals: 10
+    evals: 50
     multiplier: 0
     runtime: !expr 24 * 60 * 60 # expected in seconds
     tuner: "mbo"
   fallback:
     inner: true
-    outer: true
+    outer: false
