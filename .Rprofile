@@ -8,3 +8,9 @@ options(
   datatable.print.class = TRUE,
   datatable.print.keys = TRUE
 )
+
+# Make paralellization behave
+Sys.setenv(OMP_NUM_THREADS = 1)
+Sys.setenv(OPENBLAS_NUM_THREADS = 1)
+Sys.setenv(OMP_THREAD_LIMIT = 1)
+Sys.setenv(MKL_NUM_THREADS = 1)
