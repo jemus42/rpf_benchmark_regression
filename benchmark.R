@@ -34,32 +34,3 @@ reg <- makeExperimentRegistry(
 mlr3batchmark::batchmark(design, store_models = FALSE)
 tab <- ljoin(unwrap(getJobTable()), task_meta, by = "task_id")
 data.table::setkey(tab, job.id)
-
-sample_ids = tab[dim_rank <= 20, .SD[sample(nrow(.SD), 1)], by = c("task_id", "learner_id")]
-# sample_ids
-
-submitJobs(sample_ids)
-waitForJobs()
-
-cli::cli_alert_info("Reducing results")
-bmr <- mlr3batchmark::reduceResultsBatchmark(findDone(), store_backends = FALSE)
-
-measures <- list(
-  msr("regr.rmse", id = "rmse"),
-  msr("regr.mae", id = "mae"),
-  msr("regr.rmsle", id = "rmsle")
-)
-
-cli::cli_alert_info("Scoring results")
-scores <- bmr$score(measures, conditions = TRUE)
-cli::cli_alert_info("Aggregating results")
-aggr <- bmr$aggregate(measures, conditions = TRUE)
-
-if (!fs::dir_exists(conf$result_path)) {
-  fs::dir_create(conf$result_path, recurse = TRUE)
-}
-
-cli::cli_alert_info("Saving results")
-saveRDS(bmr, fs::path(conf$result_path, "bmr", ext = "rds"))
-saveRDS(scores, fs::path(conf$result_path, "scores", ext = "rds"))
-saveRDS(aggr, fs::path(conf$result_path, "aggr", ext = "rds"))
