@@ -44,7 +44,7 @@ task_meta <- data.table::rbindlist(lapply(tasks, \(task) {
 
 # Discard tasks with missing values etc.
 tasks_exclude <- task_meta[
-  (has_missings) | (n_logical > 0) | (n_character > 0)
+  (has_missings) | (n_logical > 0) | (n_character > 0) | dim > conf$task_dim_max
   , task_id]
 
 cli::cli_alert_warning("Excluding the following tasks due to missings or unsupported features:")

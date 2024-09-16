@@ -4,6 +4,7 @@ default:
   reg_dir: !expr here::here("registries", reg_name)
   result_path: !expr here::here("results", reg_name)
   seed: 2024
+  task_dim_max: !expr 1e6
   resampling:
     inner:
       strategy: "cv"
@@ -53,4 +54,25 @@ trial:
     tuner: "mbo"
   fallback:
     inner: true
+    outer: false
+
+debug:
+  reg_name: "debug"
+  resampling:
+    inner:
+      strategy: "cv"
+      folds: 3
+      repeats: 2
+    outer:
+      strategy: "OML" # "OML" uses existing resamplings, otherwise creat enew mlr3 resampling
+      # folds: 3
+      # repeats: 2
+  tuning:
+    # budget = evals + n_params * multiplier
+    evals: 1
+    multiplier: 0
+    runtime: !expr 24 * 60 * 60 # expected in seconds
+    tuner: "random_search"
+  fallback:
+    inner: false
     outer: false
