@@ -12,8 +12,8 @@ design <- benchmark_grid(
   paired = TRUE # To use previously instantiated resamplings
 )
 
-if (!fs::dir_exists(conf$reg_dir)) {
-  fs::dir_create(conf$reg_dir, recurse = TRUE)
+if (!fs::dir_exists(fs::path_dir(conf$reg_dir))) {
+  fs::dir_create(fs::path_dir(conf$reg_dir), recurse = TRUE)
 }
 
 if (fs::dir_exists(conf$reg_dir)) {
