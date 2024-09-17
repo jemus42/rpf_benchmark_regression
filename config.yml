@@ -48,13 +48,13 @@ trial:
       # repeats: 2
   tuning:
     # budget = evals + n_params * multiplier
-    evals: 50
+    evals: 10
     multiplier: 0
     runtime: !expr 24 * 60 * 60 # expected in seconds
     tuner: "mbo"
   fallback:
     inner: true
-    outer: false
+    outer: true
 
 debug:
   reg_name: "debug"
