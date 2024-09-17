@@ -7,7 +7,7 @@ default:
   task_dim_max: !expr 1e6
   resampling:
     inner:
-      strategy: "cv"
+      strategy: "repeated_cv"
       folds: 3
       repeats: 2
     outer:
@@ -18,7 +18,7 @@ default:
     # budget = evals + n_params * multiplier
     evals: 200
     multiplier: 0
-    runtime: !expr 24 * 60 * 60 # expected in seconds
+    runtime: !expr  6 * 24 * 60 * 60 # expected in seconds
     tuner: "mbo"
   fallback:
     inner: true
@@ -29,7 +29,7 @@ default:
       train: 12
       predict: 4
     autotuner:
-      train: 150
+      train: 156
       predict: 12
 
 production:
@@ -37,15 +37,6 @@ production:
 
 trial:
   reg_name: "trial"
-  resampling:
-    inner:
-      strategy: "repeated_cv"
-      folds: 3
-      repeats: 2
-    outer:
-      strategy: "OML" # "OML" uses existing resamplings, otherwise creat enew mlr3 resampling
-      # folds: 3
-      # repeats: 2
   tuning:
     # budget = evals + n_params * multiplier
     evals: 10
