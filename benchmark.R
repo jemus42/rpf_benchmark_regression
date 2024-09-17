@@ -31,6 +31,7 @@ reg <- makeExperimentRegistry(
   seed = conf$seed
 )
 
-mlr3batchmark::batchmark(design, store_models = FALSE)
+# store_models = TRUE required to retain tuning instances in AutoTuners
+mlr3batchmark::batchmark(design, store_models = TRUE)
 tab <- ljoin(unwrap(getJobTable()), task_meta, by = "task_id")
 data.table::setkey(tab, job.id)
