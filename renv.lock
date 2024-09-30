@@ -1063,7 +1063,6 @@
       "RemoteRepo": "mlr3extralearners",
       "RemoteRef": "main",
       "RemoteSha": "0297a064dda0424305a21f4b02cc27b47438f354",
-      "Remotes": "binderh/CoxBoost, catboost/catboost/catboost/R-package, mlr-org/mlr3proba, RaphaelS1/survivalmodels, PlantedML/randomPlantedForest, xoopR/distr6, xoopR/param6, xoopR/set6, ropensci/aorsf, mlr-org/mlr3",
       "Requirements": [
         "R",
         "R6",
@@ -1078,14 +1077,9 @@
     },
     "mlr3filters": {
       "Package": "mlr3filters",
-      "Version": "0.8.0.9000",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteRepo": "mlr3filters",
-      "RemoteUsername": "mlr-org",
-      "RemoteRef": "HEAD",
-      "RemoteSha": "da037e1333d41d7742a8dd5692a0ff288b15202a",
+      "Version": "0.8.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
       "Requirements": [
         "R",
         "R6",
@@ -1096,7 +1090,7 @@
         "mlr3misc",
         "paradox"
       ],
-      "Hash": "dabec8cd9aeaeafc7903b95ad02d67f6"
+      "Hash": "c26b96962a98a5416c7ca1f1cd6b1674"
     },
     "mlr3fselect": {
       "Package": "mlr3fselect",
@@ -1270,10 +1264,9 @@
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
-      "RemoteRepo": "mlr3tuningspaces",
       "RemoteUsername": "mlr-org",
-      "RemotePkgRef": "mlr-org/mlr3tuningspaces",
-      "RemoteRef": "HEAD",
+      "RemoteRepo": "mlr3tuningspaces",
+      "RemoteRef": "main",
       "RemoteSha": "5460cdc26f071767ad9692ffd04f203a86f8a67b",
       "Requirements": [
         "R",
@@ -1285,7 +1278,7 @@
         "mlr3tuning",
         "paradox"
       ],
-      "Hash": "db1c38bec53b29538e3fdf405901d1c8"
+      "Hash": "0230f8c66d74703f276e5fe050db66a2"
     },
     "mlr3verse": {
       "Package": "mlr3verse",
@@ -1315,15 +1308,9 @@
     },
     "mlr3viz": {
       "Package": "mlr3viz",
-      "Version": "0.9.0.9000",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "Remotes": "mlr-org/mlr3proba, mlr-org/mlr3inferr",
-      "RemoteHost": "api.github.com",
-      "RemoteRepo": "mlr3viz",
-      "RemoteUsername": "mlr-org",
-      "RemoteRef": "HEAD",
-      "RemoteSha": "db6e547bf25220e710599456f564494cbdfe6e68",
+      "Version": "0.9.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
       "Requirements": [
         "R",
         "checkmate",
@@ -1334,7 +1321,7 @@
         "utils",
         "viridis"
       ],
-      "Hash": "587a8f67e9fdd6fb42e3b7faa24eaa0b"
+      "Hash": "7f551adf4e2419d42adfe075921d72c8"
     },
     "modeltools": {
       "Package": "modeltools",
@@ -1544,11 +1531,10 @@
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
-      "RemoteRepo": "randomPlantedForest",
       "RemoteUsername": "PlantedML",
-      "RemotePkgRef": "PlantedML/randomPlantedForest",
-      "RemoteRef": "HEAD",
-      "RemoteSha": "34162f541fdebc5781eaad5f2b688fba5fd906e4",
+      "RemoteRepo": "randomPlantedForest",
+      "RemoteRef": "master",
+      "RemoteSha": "f35c5e4bcf957ed20c0e17f9a0fbfa266041572f",
       "Requirements": [
         "Rcpp",
         "checkmate",
@@ -1557,7 +1543,7 @@
         "methods",
         "utils"
       ],
-      "Hash": "364ad257cc0e6a30a0f309bd3711be0e"
+      "Hash": "0e1c12e5161515a4acae2471ec383b2d"
     },
     "ranger": {
       "Package": "ranger",
@@ -1590,13 +1576,13 @@
     },
     "renv": {
       "Package": "renv",
-      "Version": "1.0.8",
+      "Version": "1.0.9",
       "Source": "Repository",
       "Repository": "CRAN",
       "Requirements": [
         "utils"
       ],
-      "Hash": "e082251834fa427514e68bec8afc8fda"
+      "Hash": "ef233f0e9064fc88c898b340c9add5c2"
     },
     "rgenoud": {
       "Package": "rgenoud",
