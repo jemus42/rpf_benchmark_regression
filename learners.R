@@ -37,9 +37,8 @@ wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
 
 
   if (conf$fallback$inner) {
-    # base_learner$encapuslation("callr", lrn("regr.featureless"))
     base_learner$fallback = lrn("regr.featureless")
-    base_learner$encapsulate = c(train = "callr", predict = "callr")
+    base_learner$encapsulate = c(train = "evaluate", predict = "evaluate")
   }
 
   base_learner$timeout = c(train   = conf$timeout$base$train  * 3600,
@@ -68,9 +67,8 @@ wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
   )
 
   if (conf$fallback$outer) {
-    # at$encapuslation("callr", lrn("regr.featureless"))
     at$fallback = lrn("regr.featureless")
-    at$encapsulate = c(train = "callr", predict = "callr")
+    at$encapsulate = c(train = "evaluate", predict = "evaluate")
   }
 
   at$timeout = c(train   = conf$timeout$autotuner$train  * 3600,
