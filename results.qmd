@@ -29,6 +29,7 @@ editor_options:
 #| message: false
 #| warning: false
 library(ggplot2)
+library(ragg)
 library(mlr3)
 #library(mlr3batchmark)
 #library(mlr3viz)
@@ -47,20 +48,20 @@ scores <- readRDS(fs::path(conf$result_path, "scores", ext = "rds"))
 
 
 # Tuning results cleanup 
-cleanup_tuning_results <- function(results, task_meta) {
-  results <- copy(results)
-  # merge with task summary for task metadata/names
-  results <- results[task_meta[, -c("task_id")], on = c("task_id" = "task_name_full"), nomatch = 0]
-  # Cleanup learner names
-  results[, learner_name := gsub("\\.tuned", "", gsub("(encode\\.)?classif\\.", "", learner_id))]
-  # Reconstruct max_interaction from _ratio, using p from task_meta
-  # taking into account the max_interaction_limit of 20
-  results[, max_interaction := ifelse(learner_id == "classif.rpf_fixmax.tuned", 2, pmax(ceiling(max_interaction_ratio * pmin(p, 30)), 1))]
-  results[, task_name := factor(task_name, levels = task_meta$task_name)]
-  results[]
-}
-
-tuning_results_rpf   <- cleanup_tuning_results(readRDS("data/tuning_results_rpf.rds"),   task_meta = task_meta)
+# cleanup_tuning_results <- function(results, task_meta) {
+#   results <- copy(results)
+#   # merge with task summary for task metadata/names
+#   results <- results[task_meta[, -c("task_id")], on = c("task_id" = "task_name_full"), nomatch = 0]
+#   # Cleanup learner names
+#   results[, learner_name := gsub("\\.tuned", "", gsub("(encode\\.)?classif\\.", "", learner_id))]
+#   # Reconstruct max_interaction from _ratio, using p from task_meta
+#   # taking into account the max_interaction_limit of 20
+#   results[, max_interaction := ifelse(learner_id == "classif.rpf_fixmax.tuned", 2, pmax(ceiling(max_interaction_ratio * pmin(p, 30)), 1))]
+#   results[, task_name := factor(task_name, levels = task_meta$task_name)]
+#   results[]
+# }
+# 
+# tuning_results_rpf   <- cleanup_tuning_results(readRDS("data/tuning_results_rpf.rds"),   task_meta = task_meta)
 
 # Define learner colors for somewhat identifiable plots
 learner_cols <- c(
@@ -68,11 +69,12 @@ learner_cols <- c(
   "xgb" = "#3BA99C",
   "rpf_fixdepth" = "#CA1694",
   "xgb_fixdepth" = "#256A62",
-  "ranger" = "#2171B5"
+  "ranger" = "#2171B5",
+  "featureless" = "#484848"
 )
 learner_order <- names(learner_cols)
 learner_label <- function(x) {
-  c("rpf" = "RPF", "xgb" = "XGBoost", "rpf_fixdepth" = "RPF (max_int.=2)", "xgb_fixdepth" = "XGBoost (max_depth=2)", "ranger" = "ranger")[x]
+  c("rpf" = "RPF", "xgb" = "XGBoost", "rpf_fixdepth" = "RPF (max_int.=2)", "xgb_fixdepth" = "XGBoost (max_depth=2)", "ranger" = "ranger", "featureless" = "featureless")[x]
 }
 
 set.seed(3) # Only for jitterdodge consistency
@@ -82,7 +84,7 @@ set.seed(3) # Only for jitterdodge consistency
 
 - Inner resampling folds: 5
 - Outer resampling folds: 10
-- Random search with 200 evaluations
+- Bayesian optimization with 200 evaluations
 
 ### Hyperparameter Search Spaces
 
@@ -149,13 +151,13 @@ task_meta |>
 #| fig-align: center
 #| column: screen-inset-shaded
 
-aggrs |>
-  mutate(learner_name = factor(learner_name, levels = learner_order)) |>
-  ggplot(aes(x = learner_name, y = score, fill = learner_name)) +
-    facet_wrap(vars(measure), ncol = 2, scales = "free_y") +
+aggr |>
+  mutate(learner_name = factor(learner_id, levels = learner_order)) |>
+  ggplot(aes(x = learner_name, y = rmse, fill = learner_name)) +
+    #facet_wrap(vars(measure), ncol = 2, scales = "free_y") +
     geom_boxplot(alpha = .5) +
     geom_point(position = position_jitterdodge(dodge.width = .25)) +
-    scale_y_continuous(labels = scales::percent) +
+    scale_y_continuous(labels = scales::label_comma()) +
     #scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
     #coord_cartesian(ylim = c(0, 1)) +
     #coord_flip() +
@@ -212,19 +214,19 @@ aggrs |>
 #| column: screen-inset-shaded
 #| 
 scores |>
-  filter(measure == "AUC") |>
-  ggplot(aes(y = learner_name, x = score, fill = learner_name)) +
-  facet_wrap(vars(task_name)) +
+  #filter(measure == "AUC") |>
+  ggplot(aes(y = learner_id, x = rmse, fill = learner_id)) +
+  facet_wrap(vars(task_id), scales = "free") +
   geom_boxplot(alpha = .5) +
   geom_point() +
   scale_fill_manual(values = learner_cols, guide = "none") +
-  scale_x_continuous(labels = scales::percent) +
+  scale_x_continuous(labels = scales::label_comma()) +
   labs(
-    title = "Binary classification scores per task",
-    subtitle = "Tasks ordered by n * p, decreasing",
-    y = "Learner", x = "AUC (%)"
+    title = "RMSE scores per task",
+    #subtitle = "Tasks ordered by n * p, decreasing",
+    y = "Learner", x = "RMSE"
   ) +
-  theme_minimal() +
+  theme_minimal(base_size = 14) +
   theme(
     panel.spacing.x = unit(1, "cm")
   )
