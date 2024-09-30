@@ -18,7 +18,7 @@ if (!fs::file_exists(path_bmr_reduced)) {
   cli::cli_h2("Processing registry")
   getStatus()
   ids <- findDone()
-  ids = tab[, .SD[sample(nrow(.SD), 5)], by = c("problem", "algorithm", "tags")]
+  # ids = tab[, .SD[sample(nrow(.SD), 5)], by = c("problem", "algorithm", "tags")]
 
   tictoc::tic(msg = "Reducing results")
   # Disabling the progress bar for speedup with many jobs
