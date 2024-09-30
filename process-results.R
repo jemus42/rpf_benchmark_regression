@@ -18,6 +18,7 @@ if (!fs::file_exists(path_bmr_reduced)) {
   cli::cli_h2("Processing registry")
   getStatus()
   ids <- findDone()
+  ids = tab[, .SD[sample(nrow(.SD), 5)], by = c("problem", "algorithm", "tags")]
 
   tictoc::tic(msg = "Reducing results")
   # Disabling the progress bar for speedup with many jobs
@@ -41,10 +42,19 @@ measures <- list(
 
 tictoc::tic(msg = "Scoring results")
 scores <- bmr$score(measures, conditions = TRUE)
+scores <- as.data.table(scores)
+scores[, task := NULL]
+scores[, learner := NULL]
+scores[, resampling := NULL]
+scores[, resampling_id := NULL]
+
 tictoc::toc()
 
 tictoc::tic(msg = "Aggregating results")
 aggr <- bmr$aggregate(measures, conditions = TRUE)
+aggr <- as.data.table(aggr)
+aggr[, resample_result := NULL]
+aggr[, resampling_id := NULL]
 tictoc::toc()
 
 tictoc::tic(msg = "Saving to disk: scores, aggr")
