@@ -1,0 +1,352 @@
+---
+title: "RPF Regression Benchmark Results"
+author: "Lukas"
+date: now
+date-format: "YYYY-MM-DD HH:mm z"
+date-modified: last-modified
+format: 
+  html:
+    code-fold: true
+    fig-align: center
+    toc: true
+  pdf: 
+    documentclass: article
+    fig-align: center
+    toc: true
+    date: now
+    keep-tex: true
+    knitr: 
+      opts_chunk: 
+        echo: false
+        fig.pos: H
+    include-in-header: 
+      - \usepackage{float}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup}
+#| message: false
+#| warning: false
+library(ggplot2)
+library(mlr3)
+#library(mlr3batchmark)
+#library(mlr3viz)
+#library(mlr3tuning)
+library(data.table)
+library(dplyr)
+library(kableExtra)
+
+# Load task metadata
+task_meta <- readRDS("task_meta.rds")
+
+# benchmark results + cleanup
+# bmr   <- readRDS(fs::path(conf$result_path, "bmr", ext = "rds"))
+aggr   <- readRDS(fs::path(conf$result_path, "aggr",   ext = "rds"))
+scores <- readRDS(fs::path(conf$result_path, "scores", ext = "rds"))
+
+
+# Tuning results cleanup 
+cleanup_tuning_results <- function(results, task_meta) {
+  results <- copy(results)
+  # merge with task summary for task metadata/names
+  results <- results[task_meta[, -c("task_id")], on = c("task_id" = "task_name_full"), nomatch = 0]
+  # Cleanup learner names
+  results[, learner_name := gsub("\\.tuned", "", gsub("(encode\\.)?classif\\.", "", learner_id))]
+  # Reconstruct max_interaction from _ratio, using p from task_meta
+  # taking into account the max_interaction_limit of 20
+  results[, max_interaction := ifelse(learner_id == "classif.rpf_fixmax.tuned", 2, pmax(ceiling(max_interaction_ratio * pmin(p, 30)), 1))]
+  results[, task_name := factor(task_name, levels = task_meta$task_name)]
+  results[]
+}
+
+tuning_results_rpf   <- cleanup_tuning_results(readRDS("data/tuning_results_rpf.rds"),   task_meta = task_meta)
+
+# Define learner colors for somewhat identifiable plots
+learner_cols <- c(
+  "rpf" = "#F73098",
+  "xgb" = "#3BA99C",
+  "rpf_fixdepth" = "#CA1694",
+  "xgb_fixdepth" = "#256A62",
+  "ranger" = "#2171B5"
+)
+learner_order <- names(learner_cols)
+learner_label <- function(x) {
+  c("rpf" = "RPF", "xgb" = "XGBoost", "rpf_fixdepth" = "RPF (max_int.=2)", "xgb_fixdepth" = "XGBoost (max_depth=2)", "ranger" = "ranger")[x]
+}
+
+set.seed(3) # Only for jitterdodge consistency
+```
+
+## Benchmark Setup
+
+- Inner resampling folds: 5
+- Outer resampling folds: 10
+- Random search with 200 evaluations
+
+### Hyperparameter Search Spaces
+
+### `rpf`/`rpf_fixmax`
+
+- `ntrees` := 50
+- `max_interaction` in [1, 20]
+    - Via `max_interaction_ratio` in [0, 1] and `max_interaction_limit` := 20
+    - for `rpf_fixmax`: `max_interaction` := 2
+- `splits` in [10, 100]
+- `splits_try` in [1, 20]
+- `t_try` in [0.1, 1]
+
+### `ranger`
+
+- `num.trees` := 500
+- `mtry_ratio` in [0.1, 1]
+- `min.node.size` in [1, 50]
+- `sample.fracton` in [0.1, 1]
+
+### `xgboost`/`xgboost_fixdepth`
+
+- Preprocessing of categorical features using treatment encoding
+- `max_depth` in [1, 20]
+    - for `xgb_fixdepth`: `max_depth` := 2
+- `subsample` in [0.1, 1]
+- `colsample_bytree` in [0.1, 1]
+- `eta` in [0, 1] (log scale)
+- `nrounds` tuned internally via early stopping with 50 rounds of patience
+
+
+## Regression Benchmark Results
+
+- Tuning on MSE
+- Evaluation on RMSE, MAE, [RMSLE](https://mlr3.mlr-org.com/reference/mlr_measures_regr.rmsle.html)
+
+### Tasks
+
+[OpenML CTR-23](https://www.openml.org/search?type=study&study_type=task&sort=tasks_included&id=353) tasks with:
+
+- No missing values
+- $n \cdot p \leq 10^6$
+- No features of type `logical` or `character`
+
+```{r binary-tasks}
+task_meta |>
+  select(task_id, n, p, dim) |>
+  arrange(dim) |>
+  kbl(
+    caption = "Selected OpenML CTR-23 tasks, arranged by dimensionality",
+    col.names = c("Task", "n", "p", "np"),
+    booktabs = TRUE
+  ) |>
+  kable_styling()
+```
+
+### Aggregated Results
+
+#### Boxplot
+
+```{r binary-aggregated}
+#| fig-width: 12
+#| fig-height: 7
+#| fig-align: center
+#| column: screen-inset-shaded
+
+aggrs |>
+  mutate(learner_name = factor(learner_name, levels = learner_order)) |>
+  ggplot(aes(x = learner_name, y = score, fill = learner_name)) +
+    facet_wrap(vars(measure), ncol = 2, scales = "free_y") +
+    geom_boxplot(alpha = .5) +
+    geom_point(position = position_jitterdodge(dodge.width = .25)) +
+    scale_y_continuous(labels = scales::percent) +
+    #scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+    #coord_cartesian(ylim = c(0, 1)) +
+    #coord_flip() +
+    scale_fill_manual(values = learner_cols, guide = "none") +
+    labs(
+      title = "Binary Classification: Aggregated scores over all tasks",
+      x = NULL, y = "Score"
+    ) +
+    theme_minimal(base_size = 14)
+```
+
+#### Table
+
+```{r binary-aggregated-table}
+# column: screen-inset-shaded
+aggrs |>
+  group_by(learner_name, measure) |>
+  summarize(
+    mean = mean(score),
+    median = median(score),
+    sd = sd(score),
+    q25 = quantile(score, .25),
+    q75 = quantile(score, .75),
+    .groups = "drop"
+  ) |>
+  mutate(across(where(is.numeric), \(x) round(100 * x, 1))) |>
+  mutate(
+    mean = glue::glue("{mean} [{sd}]"),
+    median = glue::glue("{median} [{q25}; {q75}]")
+  ) |>
+  select(-sd, -q25, -q75) |>
+  tidyr::pivot_wider(names_from = measure, names_sep = "_", values_from = mean:median) |>
+  select(learner_name, contains("AUC"), contains("Brier")) |>
+  kbl(
+    col.names = c("Learner", rep(c("Mean [SD]", "Median [q25; q75]"), 2)),
+    booktabs = TRUE
+  ) |>
+  kable_styling(full_width = TRUE, latex_options = c("HOLD_position")) |>
+  add_header_above(header = c(" " = 1, "AUC (%)" = 2, "Brier Score (%)" = 2)) |>
+  column_spec(1, "4cm") |>
+  column_spec(2, "2.3cm") |>
+  column_spec(3, "3cm") |>
+  column_spec(4, "2.3cm") |>
+  column_spec(5, "3cm")
+```
+
+
+### Results per Task
+
+```{r binary-per-task}
+#| fig-width: 12
+#| fig-height: 7
+#| fig-align: center
+#| column: screen-inset-shaded
+#| 
+scores |>
+  filter(measure == "AUC") |>
+  ggplot(aes(y = learner_name, x = score, fill = learner_name)) +
+  facet_wrap(vars(task_name)) +
+  geom_boxplot(alpha = .5) +
+  geom_point() +
+  scale_fill_manual(values = learner_cols, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Binary classification scores per task",
+    subtitle = "Tasks ordered by n * p, decreasing",
+    y = "Learner", x = "AUC (%)"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.spacing.x = unit(1, "cm")
+  )
+```
+
+
+```{r binary-per-task-brier}
+#| fig-width: 12
+#| fig-height: 7
+#| fig-align: center
+#| column: screen-inset-shaded
+
+scores |>
+  filter(measure == "Brier Score") |>
+  ggplot(aes(y = learner_name, x = score, fill = learner_name)) +
+  facet_wrap(vars(task_name)) +
+  geom_boxplot(alpha = .5) +
+  geom_point() +
+  scale_fill_manual(values = learner_cols, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Binary classification scores per task",
+    subtitle = "Tasks ordered by n * p, decreasing",
+    y = "Learner", x = "Brier Score (%)"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.spacing.x = unit(1, "cm")
+  )
+```
+
+### Tuning Results
+
+Showing best performing parameter combinations of the inner folds, e.g. the parameters that "won".
+One plot per hyperparameter, with performance on y-axis.
+
+Note that `max_interaction` is tuned by tuning `max_interaction_ratio` within [0, 1] and then calculating
+
+$$\max(\lceil \mathtt{max\_interaction\_ratio} \cdot \min(p, 30)\rceil, 1)$$
+
+to effectively tune `max_interaction` within 1 and $p$ or 30, whichever is lower. 
+This is not ideal since multiple values for `max_interaction_ratio` could result in the same value for `max_interaction` for large $p$, but it's a compromise.
+
+```{r binary-tuning-results}
+#| fig-width: 12
+#| fig-height: 7
+#| fig-align: center
+#| column: screen-inset-shaded
+
+tuning_results_rpf |>
+  ggplot(aes(x = splits, y = classif.auc, color = learner_name)) +
+  facet_wrap(vars(task_name)) +
+  geom_point(size = 2, alpha = .75) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(
+    title = "Binary classifification tuning results",
+    subtitle = "Tuned on AUC"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.spacing.x = unit(1, "cm"),
+    legend.position = "bottom"
+  )
+
+tuning_results_rpf |>
+ # mutate(task_name = glue::glue("{task_name} (p={p})")) |>
+  ggplot(aes(x = max_interaction, y = classif.auc, color = learner_name)) +
+  facet_wrap(vars(task_name)) +
+  geom_point(size = 2, alpha = .75) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(
+    title = "Binary classifification tuning results",
+    subtitle = "Tuned on AUC"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.spacing.x = unit(1, "cm"),
+    legend.position = "bottom"
+  )
+
+tuning_results_rpf |>
+  ggplot(aes(x = loss, y = classif.auc, color = learner_name)) +
+  facet_wrap(vars(task_name)) +
+  geom_point(size = 2, alpha = .75) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(
+    title = "Binary classifification tuning results",
+    subtitle = "Tuned on AUC"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.spacing.x = unit(1, "cm"),
+    legend.position = "bottom"
+  )
+
+tuning_results_rpf |>
+  ggplot(aes(x = split_try, y = classif.auc, color = learner_name)) +
+  facet_wrap(vars(task_name)) +
+  geom_point(size = 2, alpha = .75) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(
+    title = "Binary classifification tuning results",
+    subtitle = "Tuned on AUC"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.spacing.x = unit(1, "cm"),
+    legend.position = "bottom"
+  )
+
+tuning_results_rpf |>
+  ggplot(aes(x = t_try, y = classif.auc, color = learner_name)) +
+  facet_wrap(vars(task_name)) +
+  geom_point(size = 2, alpha = .75) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(
+    title = "Binary classifification tuning results",
+    subtitle = "Tuned on AUC"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.spacing.x = unit(1, "cm"),
+    legend.position = "bottom"
+  )
+```
