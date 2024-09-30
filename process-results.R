@@ -1,5 +1,6 @@
 library(batchtools)
 library(mlr3)
+library(mlr3tuning)
 
 if (!fs::dir_exists(conf$result_path)) {
   fs::dir_create(conf$result_path, recurse = TRUE)
@@ -23,10 +24,6 @@ if (!fs::file_exists(path_bmr_reduced)) {
   options(batchtools.progress = FALSE)
   bmr <- mlr3batchmark::reduceResultsBatchmark(findDone(), store_backends = FALSE)
   options(batchtools.progress = TRUE)
-  tictoc::toc()
-
-  tictoc::tic(msg = "Saving full bmr")
-  saveRDS(bmr, fs::path(conf$result_path, "bmr", ext = "rds"))
   tictoc::toc()
 
 } else {
@@ -84,5 +81,9 @@ tictoc::tic(msg = "Saving to disk: scores, aggr")
 saveRDS(scores, fs::path(conf$result_path, "scores", ext = "rds"))
 saveRDS(aggr, fs::path(conf$result_path, "aggr", ext = "rds"))
 tictoc::toc()
+
+# tictoc::tic(msg = "Saving full bmr")
+# saveRDS(bmr, fs::path(conf$result_path, "bmr", ext = "rds"))
+# tictoc::toc()
 
 cli::cli_alert_success("Done!")
