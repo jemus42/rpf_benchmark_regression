@@ -16,7 +16,7 @@ if (!fs::file_exists(path_bmr_reduced)) {
   data.table::setkey(tab, job.id)
 
   cli::cli_h2("Processing registry")
-  getStatus()
+  print(getStatus())
   ids <- findDone()
   # ids = tab[, .SD[sample(nrow(.SD), 5)], by = c("problem", "algorithm", "tags")]
 
@@ -37,7 +37,9 @@ cli::cli_h2("Scoring and aggregating")
 measures <- list(
   msr("regr.rmse", id = "rmse"),
   msr("regr.mae", id = "mae"),
-  msr("regr.rmsle", id = "rmsle")
+  # msr("regr.rmsle", id = "rmsle"), # Not useful since some tasks have negative target
+  # https://mlr3measures.mlr-org.com/reference/rrse.html
+  msr("regr.rrse", id = "rrse")
 )
 
 tictoc::tic(msg = "Scoring results")
@@ -47,7 +49,7 @@ scores[, task := NULL]
 scores[, learner := NULL]
 scores[, resampling := NULL]
 scores[, resampling_id := NULL]
-
+scores[, uhash := NULL]
 tictoc::toc()
 
 tictoc::tic(msg = "Aggregating results")
@@ -55,6 +57,7 @@ aggr <- bmr$aggregate(measures, conditions = TRUE)
 aggr <- as.data.table(aggr)
 aggr[, resample_result := NULL]
 aggr[, resampling_id := NULL]
+aggr[, uhash := NULL]
 tictoc::toc()
 
 tictoc::tic(msg = "Saving to disk: scores, aggr")

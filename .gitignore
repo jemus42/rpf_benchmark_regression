@@ -5,4 +5,7 @@
 .Renviron
 registries/*
 results/*
+results_files
+results.html
 attic
+Rplots.pdf
