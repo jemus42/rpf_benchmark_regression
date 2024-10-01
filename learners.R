@@ -30,15 +30,19 @@ wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
   }
 
   # Used for XGBoost learners to enable internal tuning / early stopping using test set
-  if ("validation" %in% base_learner$properties) {
-    cli::cli_alert_info("Setting validation for {.val {learner_id}}")
-    set_validate(base_learner, "test")
-  }
+  # if ("validation" %in% base_learner$properties) {
+  #   cli::cli_alert_info("Setting validation for {.val {learner_id}}")
+  #   set_validate(base_learner, "test")
+  # }
 
 
   if (conf$fallback$inner) {
-    base_learner$fallback = lrn("regr.featureless")
-    base_learner$encapsulate = c(train = "evaluate", predict = "evaluate")
+    if (packageVersion("mlr3") >= "0.21.0") {
+      base_learner$encapsulate("evaluate", lrn("regr.featureless"))
+    } else {
+      base_learner$fallback = lrn("regr.featureless")
+      base_learner$encapsulate = c(train = "evaluate", predict = "evaluate")
+    }
   }
 
   base_learner$timeout = c(train   = conf$timeout$base$train  * 3600,
@@ -67,8 +71,12 @@ wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
   )
 
   if (conf$fallback$outer) {
-    at$fallback = lrn("regr.featureless")
-    at$encapsulate = c(train = "evaluate", predict = "evaluate")
+    if (packageVersion("mlr3") >= "0.21.0") {
+      at$encapsulate("evaluate", lrn("regr.featureless"))
+    } else {
+      at$fallback = lrn("regr.featureless")
+      at$encapsulate = c(train = "evaluate", predict = "evaluate")
+    }
   }
 
   at$timeout = c(train   = conf$timeout$autotuner$train  * 3600,
@@ -108,37 +116,43 @@ learners <- list(
   ,
 
   xgb = wrap_autotuner(
-    learner_id = "regr.xgboost", early_stopping_rounds = 50,
+    learner_id = "regr.xgboost",
+    # early_stopping_rounds = 50,
+    # eval_metric = "rmse",
     .encode = TRUE,
     search_space = ps(
       regr.xgboost.max_depth        = p_int(1, 20),
       regr.xgboost.subsample        = p_dbl(0.1, 1),
       regr.xgboost.colsample_bytree = p_dbl(0.1, 1),
       regr.xgboost.eta              = p_dbl(1e-4, 1, logscale = TRUE),
-      regr.xgboost.nrounds          = p_int(upper = 5000, tags = "internal_tuning",
-                                            aggr = function(x) as.integer(mean(unlist(x))))
+      regr.xgboost.nrounds          = p_int(lower = 10, upper = 5000)
+      # regr.xgboost.nrounds          = p_int(upper = 5000, tags = "internal_tuning",
+      #                                       aggr = function(x) as.integer(mean(unlist(x))))
     )
   )
 
   ,
 
   xgb_fixdepth = wrap_autotuner(
-    learner_id = "regr.xgboost", max_depth = 2, early_stopping_rounds = 50,
+    learner_id = "regr.xgboost",
+    max_depth = 2,
+    # early_stopping_rounds = 50,
+    # eval_metric = "rmse",
     .encode = TRUE,
     search_space = ps(
-      regr.xgboost.max_depth        = p_int(1, 20),
       regr.xgboost.subsample        = p_dbl(0.1, 1),
       regr.xgboost.colsample_bytree = p_dbl(0.1, 1),
       regr.xgboost.eta              = p_dbl(1e-4, 1, logscale = TRUE),
-      regr.xgboost.nrounds          = p_int(upper = 5000, tags = "internal_tuning",
-                                            aggr = function(x) as.integer(mean(unlist(x))))
+      regr.xgboost.nrounds          = p_int(lower = 10, upper = 5000)
+      # regr.xgboost.nrounds          = p_int(upper = 5000, tags = "internal_tuning",
+      #                                       aggr = function(x) as.integer(mean(unlist(x))))
     )
   )
 
   ,
 
   ranger = wrap_autotuner(
-    learner_id = "regr.ranger", num.trees = 50,
+    learner_id = "regr.ranger", num.trees = 500,
     search_space = ps(
       mtry.ratio      = p_dbl(0.1, 1),
       min.node.size   = p_int(1, 50),
