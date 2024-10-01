@@ -57,7 +57,6 @@ aggr <- bmr$aggregate(measures, conditions = TRUE)
 aggr <- as.data.table(aggr)
 aggr[, resample_result := NULL]
 aggr[, resampling_id := NULL]
-aggr[, uhash := NULL]
 tictoc::toc()
 
 tictoc::tic(msg = "Saving to disk: scores, aggr")
