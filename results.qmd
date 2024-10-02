@@ -151,7 +151,7 @@ task_meta |>
 ```{r}
 plot_aggr <- function(xdf, 
                       measures = c("rmse", "mae", "rrse"),
-                      include_featless = TRUE, logscale = FALSE, ncol = 2) {
+                      include_featless = TRUE, logscale = FALSE, ncol = 2, outlier_threshold = 1e4) {
   
   xdf <- xdf |>
     tidyr::pivot_longer(
@@ -166,6 +166,12 @@ plot_aggr <- function(xdf,
   if (!include_featless) {
     xdf <- xdf |>
       filter(learner_id != "featureless")
+  }
+  
+  if (!logscale) {
+    num_outliers <- sum(xdf$score > outlier_threshold)
+    xdf <- xdf |>
+      filter(score < .env$outlier_threshold)
   }
 
   p <- xdf |>
@@ -189,9 +195,11 @@ plot_aggr <- function(xdf,
     )
   
   if (logscale) {
-    p <- p + scale_x_continuous(labels = scales::label_comma())
+    p <- p + scale_x_log10(labels = scales::label_comma(accuracy = 0.01)) +
+      labs(x = "Scores (log10)")
   } else {
-    p <- p + scale_x_log10(labels = scales::label_comma())
+    p <- p + scale_x_continuous(labels = scales::label_comma()) +
+      labs(x = "Scores", caption = glue::glue("{num_outliers} outlier scores above {outlier_threshold} are omitted"))
   }
   p
 }
@@ -200,6 +208,10 @@ plot_aggr <- function(xdf,
 
 #### Boxplot
 
+::: {.panel-tabset}
+
+##### Regular
+
 ```{r aggregated}
 #| fig-width: 12
 #| fig-height: 7
@@ -207,7 +219,6 @@ plot_aggr <- function(xdf,
 #| column: screen-inset-shaded
 
 plot_aggr(aggr, include_featless = TRUE, logscale = FALSE, ncol = 1)
-
 ```
 
 Without featureless learner
@@ -219,8 +230,32 @@ Without featureless learner
 #| column: screen-inset-shaded
 
 plot_aggr(aggr, include_featless = FALSE, logscale = FALSE, ncol = 1)
-
 ```
+
+##### Log Scale
+
+```{r aggregated-logscale}
+#| fig-width: 12
+#| fig-height: 7
+#| fig-align: center
+#| column: screen-inset-shaded
+
+plot_aggr(aggr, include_featless = TRUE, logscale = TRUE, ncol = 1)
+```
+
+Without featureless learner
+
+```{r aggregated-logscale-no-featless}
+#| fig-width: 12
+#| fig-height: 7
+#| fig-align: center
+#| column: screen-inset-shaded
+
+plot_aggr(aggr, include_featless = FALSE, logscale = TRUE, ncol = 1)
+```
+
+
+:::
 
 #### Table
 
@@ -300,7 +335,7 @@ plot_scores <- function(xdf, measure = "rmse", include_featless = TRUE, logscale
     )
   
   if (logscale) {
-    p + scale_x_log10(labels = scales::label_comma())
+    p + scale_x_log10(labels = scales::label_comma(accuracy = 0.01))
   } else {
     p + scale_x_continuous(labels = scales::label_comma())
   }
