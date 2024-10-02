@@ -7,8 +7,9 @@ if (!fs::dir_exists(conf$result_path)) {
   fs::dir_create(conf$result_path, recurse = TRUE)
 }
 
-save_obj <- function(obj, name, postfix = "") {
-  path <- fs::path(conf$result_path, glue::glue("{name}_{postfix}"), ext = "rds")
+save_obj <- function(obj, name, postfix = NULL) {
+  if (!is.null(postfix)) name <- paste0(name, "_", postfix)
+  path <- fs::path(conf$result_path, name, ext = "rds")
   cli::cli_alert_info("Saving {.val {deparse(substitute(obj))}} to {.file {fs::path_rel(path)}}")
   saveRDS(obj, path)
 }
