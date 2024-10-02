@@ -13,6 +13,7 @@ save_obj <- function(obj, name, postfix = "") {
   saveRDS(obj, path)
 }
 
+tictoc::tic("Full result processing")
 reg <- loadRegistry(conf$reg_dir, writeable = FALSE)
 task_meta <- readRDS("task_meta.rds")
 tab <- ljoin(unwrap(getJobTable()), task_meta, by = "task_id")
@@ -143,3 +144,4 @@ save_obj(archives_ranger, name = "results", postfix = "ranger")
 tictoc::toc()
 
 cli::cli_alert_success("Done!")
+tictoc::toc()
