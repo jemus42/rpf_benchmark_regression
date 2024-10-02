@@ -1,6 +1,7 @@
 library(batchtools)
 library(mlr3)
 library(mlr3tuning)
+library(data.table)
 
 if (!fs::dir_exists(conf$result_path)) {
   fs::dir_create(conf$result_path, recurse = TRUE)
@@ -85,7 +86,7 @@ archives_rpf <- tuning_archives[
 
 archives_rpf <- merge(archives_rpf, task_meta, by = "task_id")
 archives_rpf[, rmse := sqrt(regr.mse)]
-archives_rpf[, max_interaction = ifelse(learner_id == "rpf", pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1), 2)]
+archives_rpf[, max_interaction := fifelse(learner_id == "rpf", pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1), 2)]
 
 archives_xgb <- tuning_archives[
   startsWith(learner_id, "xgb"),
@@ -118,7 +119,7 @@ results_rpf <- tuning_results[
 
 results_rpf <- merge(results_rpf, task_meta, by = "task_id")
 results_rpf[, rmse := sqrt(regr.mse)]
-results_rpf[, max_interaction = ifelse(learner_id == "rpf", pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1), 2)]
+results_rpf[, max_interaction := fifelse(learner_id == "rpf", pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1), 2)]
 
 results_xgb <- tuning_results[
   startsWith(learner_id, "xgb"),
