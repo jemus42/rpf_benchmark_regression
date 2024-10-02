@@ -24,7 +24,7 @@ task_meta <- data.table::rbindlist(lapply(tasks, \(task) {
 
   x <- task$data(cols = task$feature_names)
 
-  task_meta <- data.table::data.table(
+  data.table::data.table(
     task_id = task$id,
     n = task$nrow,
     p = task$n_features,
@@ -37,8 +37,6 @@ task_meta <- data.table::rbindlist(lapply(tasks, \(task) {
     n_character = sum(vapply(x, \(col) is.character(col), logical(1))),
     n_logical   = sum(vapply(x, \(col) is.logical(col),   logical(1)))
   )
-
-  task_meta
 }))
 
 
@@ -55,9 +53,13 @@ tasks <- tasks[tasks_keep_ids]
 task_meta <- task_meta[tasks_keep_ids]
 task_meta[, dim_rank := rank(dim)]
 
+task_meta[, task_label := sprintf("%s (%i x %i)", task_id, n, p)]
+task_meta[, task_label := factor(task_label, levels = task_label, ordered = TRUE)]
+task_meta[, task_id := factor(task_id, levels = task_id, ordered = TRUE)]
+
+data.table::setorder(task_meta, dim_rank)
+
 cli::cli_alert_info("{.val {length(tasks)}} tasks remaining")
-
-
 
 # Resampling ----------------------------------------------------------------------------------
 cli::cli_h2("Creating resamplings")
