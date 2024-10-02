@@ -10,6 +10,18 @@ path_bmr_reduced <- fs::path(conf$result_path, "bmr_reduced", ext = "rds")
 path_archives <- fs::path(conf$result_path, "tuning_archives", ext = "rds")
 path_results <- fs::path(conf$result_path, "tuning_results", ext = "rds")
 
+save_archive <- function(archive, name) {
+  path <- fs::path(conf$result_path, glue::glue("tuning_archive_{name}"), ext = "rds")
+  cli::cli_alert_info("Saving {.val {deparse(substitute(archive))}} to {.file {fs::path_rel(path)}}")
+  saveRDS(archive, path)
+}
+
+save_results <- function(archive, name) {
+  path <- fs::path(conf$result_path, glue::glue("tuning_results_{name}"), ext = "rds")
+  cli::cli_alert_info("Saving {.val {deparse(substitute(archive))}} to {.file {fs::path_rel(path)}}")
+  saveRDS(archive, path)
+}
+
 if (!fs::file_exists(path_bmr_reduced)) {
   reg <- loadRegistry(conf$reg_dir, writeable = FALSE)
   tab <- ljoin(unwrap(getJobTable()), readRDS("task_meta.rds"), by = "task_id")
@@ -50,13 +62,23 @@ scores[, learner := NULL]
 scores[, resampling := NULL]
 scores[, resampling_id := NULL]
 scores[, uhash := NULL]
+
+score_errors <- sapply(scores$errors, \(x) length(x) > 0, simplify = TRUE) |> sum()
+score_warnings <- sapply(scores$warnings, \(x) length(x) > 0, simplify = TRUE) |> sum()
+
+if (score_errors == 0) scores[, errors := NULL]
+if (score_warnings == 0) scores[, warnings := NULL]
 tictoc::toc()
+
 
 tictoc::tic(msg = "Aggregating results")
 aggr <- bmr$aggregate(measures, conditions = TRUE)
 aggr <- as.data.table(aggr)
 aggr[, resample_result := NULL]
 aggr[, resampling_id := NULL]
+
+if (sum(aggr[, errors]) == 0) aggr[, errors := NULL]
+if (sum(aggr[, warnings]) == 0) aggr[, warnings := NULL]
 tictoc::toc()
 
 tictoc::tic(msg = "Saving to disk: scores, aggr")
@@ -71,28 +93,61 @@ if (!fs::file_exists(path_bmr_reduced)) {
 
   tictoc::tic("Extracting and saving tuning archives")
   tuning_archives <- extract_inner_tuning_archives(bmr, unnest = NULL)
-  saveRDS(archives, path_archives)
+
+  archives_rpf <- tuning_archives[startsWith(learner_id, "rpf"),
+                                  .(learner_id, experiment, task_id, iteration, splits, split_try, t_try, max_interaction_ratio, regr.mse,
+                                    runtime_learners, timestamp, warnings, errors, batch_nr)]
+
+  archives_xgb <- tuning_archives[startsWith(learner_id, "xgb"),
+                                  .(learner_id, experiment, task_id, iteration, regr.xgboost.max_depth, regr.xgboost.subsample,
+                                    regr.xgboost.colsample_bytree, regr.xgboost.eta, regr.xgboost.nrounds, regr.mse,
+                                    runtime_learners, timestamp, warnings, errors, batch_nr)]
+  archives_xgb[, regr.xgboost.eta := exp(regr.xgboost.eta)] # due to tuning in logscale
+  names_to_trim <- stringr::str_subset(names(archives_xgb), "xgb")
+  data.table::setnames(archives_xgb,
+                       old = names_to_trim,
+                       new = stringr::str_remove(names_to_trim, "^regr\\.xgboost\\."))
+
+  archives_ranger <- tuning_archives[learner_id == "ranger",
+                                     .(learner_id, experiment, task_id, iteration, mtry.ratio, min.node.size, sample.fraction,
+                                       regr.mse, runtime_learners, timestamp, warnings, errors, batch_nr)]
+
+  save_archive(archives_rpf, "rpf")
+  save_archive(archives_xgb, "xgb")
+  save_archive(archives_ranger, "ranger")
+
   tictoc::toc()
 
   tictoc::tic("Extracting and saving tuning results")
   tuning_results <- extract_inner_tuning_results(bmr)
-  saveRDS(archives, path_results)
+
+  results_rpf <- tuning_results[startsWith(learner_id, "rpf"),
+                                .(learner_id, experiment, task_id, iteration, splits, split_try, t_try, max_interaction_ratio, regr.mse)]
+
+  results_xgb <- tuning_results[startsWith(learner_id, "xgb"),
+                                .(learner_id, experiment, task_id, iteration, regr.xgboost.max_depth, regr.xgboost.subsample,
+                                  regr.xgboost.colsample_bytree, regr.xgboost.eta, regr.xgboost.nrounds, regr.mse)]
+  results_xgb[, regr.xgboost.eta := exp(regr.xgboost.eta)] # due to tuning in logscale
+  names_to_trim <- stringr::str_subset(names(results_xgb), "xgb")
+  data.table::setnames(results_xgb,
+                       old = names_to_trim,
+                       new = stringr::str_remove(names_to_trim, "^regr\\.xgboost\\."))
+
+  results_ranger <- tuning_results[learner_id == "ranger",
+                                   .(learner_id, experiment, task_id, iteration, mtry.ratio, min.node.size, sample.fraction, regr.mse)]
+
+  save_results(results_rpf, "rpf")
+  save_results(results_xgb, "xgb")
+  save_results(results_ranger, "ranger")
   tictoc::toc()
 
-  cli::cli_alert_info("Discarding models from bmr")
-  bmr$discard(models = TRUE)
+  # cli::cli_alert_info("Discarding models from bmr")
+  # bmr$discard(models = TRUE)
 
-  tictoc::tic("Saving reduced bmr")
-  saveRDS(bmr, path_bmr_reduced)
-  tictoc::toc()
+  # tictoc::tic("Saving reduced bmr")
+  # saveRDS(bmr, path_bmr_reduced)
+  # tictoc::toc()
 
-} else {
-  cli::cli_alert_info("Reduced bmr already exists! Reading from disk.")
-  bmr <- readRDS(path_bmr_reduced)
 }
-
-# tictoc::tic(msg = "Saving full bmr")
-# saveRDS(bmr, fs::path(conf$result_path, "bmr", ext = "rds"))
-# tictoc::toc()
 
 cli::cli_alert_success("Done!")
