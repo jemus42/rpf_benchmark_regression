@@ -418,7 +418,7 @@ plot_archive <- function(xdf, param) {
 ```
 
 
-Showing best performing parameter combinations of the inner folds, e.g. the parameters that "won".
+Showing only the best performing parameter combinations of the inner folds, e.g. the parameters that "won".
 One plot per hyperparameter, with performance on y-axis.
 
 Note that `max_interaction` is tuned by tuning `max_interaction_ratio` within [0, 1] and then calculating
@@ -443,7 +443,7 @@ plot_archive(results_rpf, "t_try")
 plot_archive(results_rpf, "max_interaction")
 ```
 
-### Tuning archives
+### Tuning Archives
 
 Showing all evaluated hyperparameter configurations to get an impression of the space the MBO algorithm explored.
 
