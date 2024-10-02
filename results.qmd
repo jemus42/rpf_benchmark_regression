@@ -4,6 +4,7 @@ author: "Lukas"
 date: now
 date-format: "YYYY-MM-DD HH:mm z"
 date-modified: last-modified
+lightbox: true
 format: 
   html:
     code-fold: true
@@ -49,12 +50,13 @@ task_meta <- task_meta |>
     task_id = factor(task_id, levels = task_id, ordered = TRUE)
   )
 
-# benchmark results + cleanup
-# bmr   <- readRDS(fs::path(conf$result_path, "bmr", ext = "rds"))
+# benchmark results
 aggr   <- readRDS(fs::path(conf$result_path, "aggr",   ext = "rds"))
 scores <- readRDS(fs::path(conf$result_path, "scores", ext = "rds"))
-
 scores <- task_meta[scores, on = c("task_id")]
+
+archives_rpf <- readRDS(fs::path(conf$result_path, "archives_rpf", ext = "rds"))
+results_rpf <- readRDS(fs::path(conf$result_path, "results_rpf", ext = "rds"))
 
 # Define learner colors for somewhat identifiable plots
 learner_cols <- c(
@@ -67,7 +69,9 @@ learner_cols <- c(
 )
 learner_order <- names(learner_cols)
 learner_label <- function(x) {
-  c("rpf" = "RPF", "xgb" = "XGBoost", "rpf_fixdepth" = "RPF (max_int.=2)", "xgb_fixdepth" = "XGBoost (max_depth=2)", "ranger" = "ranger", "featureless" = "Featureless")[x]
+  x <- as.character(x)
+  ret <- c("rpf" = "RPF", "xgb" = "XGBoost", "rpf_fixdepth" = "RPF (2)", "xgb_fixdepth" = "XGBoost (2)", "ranger" = "ranger", "featureless" = "Featureless")[x]
+  unname(ret)
 }
 
 # aggr[, learner_label := learner_label(learner_id)]
@@ -87,38 +91,32 @@ set.seed(3) # Only for jitterdodge consistency
 
 ### Hyperparameter Search Spaces
 
-### `rpf`/`rpf_fixmax`
+### RPF / RPF (2)
 
 - `ntrees` := 50
 - `max_interaction` in [1, 20]
     - Via `max_interaction_ratio` in [0, 1] and `max_interaction_limit` := 20
-    - for `rpf_fixmax`: `max_interaction` := 2
+    - for **RPF (2)**: `max_interaction` := 2
 - `splits` in [10, 100]
 - `splits_try` in [1, 20]
 - `t_try` in [0.1, 1]
 
-### `ranger`
+### ranger
 
 - `num.trees` := 500
 - `mtry.ratio` in [0.1, 1]
 - `min.node.size` in [1, 50]
 - `sample.fracton` in [0.1, 1]
 
-### `xgboost`/`xgboost_fixdepth`
+### XGBoost / XGBoost (2)
 
 - Preprocessing of categorical features using treatment encoding
 - `max_depth` in [1, 20]
-    - for `xgb_fixdepth`: `max_depth` := 2
+    - for **XGBoost (2)**: `max_depth` := 2
 - `subsample` in [0.1, 1]
 - `colsample_bytree` in [0.1, 1]
-- `eta` in [0, 1] (log scale)
-- `nrounds` tuned internally via early stopping with 50 rounds of patience
-
-
-## Regression Benchmark Results
-
-- Tuning on MSE
-- Evaluation on RMSE, MAE, [RRSE](https://mlr3measures.mlr-org.com/reference/rrse.html)
+- `eta` in [0.0001, 1] (log scale)
+- `nrounds` in [10, 5000]
 
 ### Tasks
 
@@ -140,10 +138,17 @@ task_meta |>
   kable_styling()
 ```
 
+## Regression Benchmark Results
+
+- Tuning on Mean Squared Error (MSE)
+- Evaluation on 
+  - Root Mean Square Error (RMSE)
+  - Root Relative Squared Error ([RRSE](https://mlr3measures.mlr-org.com/reference/rrse.html)), where 1 corresponds to the performance of the featureless learner and lower is better
+  - Median Absolute Error (MAE)
+
 ### Aggregated Results
 
 ```{r}
-
 plot_aggr <- function(xdf, 
                       measures = c("rmse", "mae", "rrse"),
                       include_featless = TRUE, logscale = FALSE, ncol = 2) {
@@ -153,6 +158,9 @@ plot_aggr <- function(xdf,
       cols = any_of(measures),
       names_to = "measure",
       values_to = "score"
+    ) |>
+    mutate(
+      measure = factor(measure, levels = c("rmse", "rrse", "mae"))
     )
 
   if (!include_featless) {
@@ -198,7 +206,7 @@ plot_aggr <- function(xdf,
 #| fig-align: center
 #| column: screen-inset-shaded
 
-plot_aggr(aggr, include_featless = TRUE, logscale = FALSE, ncol = 2)
+plot_aggr(aggr, include_featless = TRUE, logscale = FALSE, ncol = 1)
 
 ```
 
@@ -210,7 +218,7 @@ Without featureless learner
 #| fig-align: center
 #| column: screen-inset-shaded
 
-plot_aggr(aggr, include_featless = FALSE, logscale = FALSE, ncol = 2)
+plot_aggr(aggr, include_featless = FALSE, logscale = FALSE, ncol = 1)
 
 ```
 
@@ -233,7 +241,7 @@ aggr |>
     q75 = quantile(score, .75, na.rm = TRUE),
     .groups = "drop"
   ) |>
-  mutate(across(where(is.numeric), \(x) round(100 * x, 1))) |>
+  mutate(across(where(is.numeric), \(x) round(x, 2))) |>
   mutate(
     mean = glue::glue("{mean} [{sd}]"),
     median = glue::glue("{median} [{q25}; {q75}]")
@@ -258,98 +266,199 @@ aggr |>
 
 ### Results per Task
 
+```{r}
+plot_scores <- function(xdf, measure = "rmse", include_featless = TRUE, logscale = FALSE, ncol = 4) {
+  xdf <- xdf |>
+    tidyr::pivot_longer(
+      cols = any_of(c("rmse", "mae", "rrse")),
+      names_to = "measure", names_transform = toupper,
+      values_to = "score"
+    ) |>
+    filter(.data$measure == toupper(.env$measure))
+  
+  if (!include_featless) {
+    xdf <- xdf |>
+      filter(learner_id != "featureless")
+  }
+  
+  p <- xdf |>
+    ggplot(aes(y = learner_id, x = score, fill = learner_id)) +
+    facet_wrap(vars(task_label), ncol = ncol, scales = "free") +
+    geom_boxplot(alpha = .5) +
+    geom_point() +
+    scale_fill_manual(values = learner_cols, guide = "none") +
+    scale_y_discrete(labels = learner_label) +
+    labs(
+      # title = "Scores per task",
+      # subtitle = "Tasks ordered by n * p, decreasing",
+      y = NULL, x = toupper(measure)
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+      panel.spacing.x = unit(1, "cm"),
+      plot.title.position = "plot"
+    )
+  
+  if (logscale) {
+    p + scale_x_log10(labels = scales::label_comma())
+  } else {
+    p + scale_x_continuous(labels = scales::label_comma())
+  }
+}
+```
+
 Tasks ordered by $n \cdot p$, decreasing.
 
-```{r per-task}
+::: {.panel-tabset}
+
+#### RMSE
+
+```{r per-task-rmse}
 #| fig-width: 16
 #| fig-height: 11
 #| fig-align: center
 #| column: screen-inset-shaded
+#| message: false
+#| error: false
 
-scores |>
-  ggplot(aes(y = learner_id, x = rmse, fill = learner_id)) +
-  facet_wrap(vars(task_label), ncol = 4, scales = "free") +
-  geom_boxplot(alpha = .5) +
-  geom_point() +
-  scale_fill_manual(values = learner_cols, guide = "none") +
-  scale_x_continuous(labels = scales::label_comma()) +
-  scale_y_discrete(labels = learner_label) +
-  labs(
-    # title = "Scores per task",
-    # subtitle = "Tasks ordered by n * p, decreasing",
-    y = NULL, x = "RMSE"
-  ) +
-  theme_minimal(base_size = 13) +
-  theme(
-    panel.spacing.x = unit(1, "cm"),
-    plot.title.position = "plot"
-  )
-
+plot_scores(scores, "rmse", include_featless = TRUE, logscale = FALSE, ncol = 4)
 ```
 
 Without featureless learner
 
-```{r per-task-no-featless}
-#| fig-width: 12
-#| fig-height: 9
+```{r per-task-rmse-no-featless}
+#| fig-width: 16
+#| fig-height: 11
 #| fig-align: center
 #| column: screen-inset-shaded
+#| message: false
+#| error: false
 
-scores |>
-  filter(learner_id != "featureless") |>
-  ggplot(aes(y = learner_id, x = rmse, fill = learner_id)) +
-  facet_wrap(vars(task_label), ncol = 4, scales = "free") +
-  geom_boxplot(alpha = .5) +
-  geom_point() +
-  scale_fill_manual(values = learner_cols, guide = "none") +
-  scale_x_continuous(labels = scales::label_comma()) +
-  scale_y_discrete(labels = learner_label) +
-  labs(
-    # title = "Scores per task",
-    # subtitle = "Tasks ordered by n * p, decreasing",
-    y = NULL, x = "RMSE"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(
-    panel.spacing.x = unit(1, "cm"),
-    plot.title.position = "plot"
-  )
-
+plot_scores(scores, "rmse", include_featless = FALSE, logscale = FALSE, ncol = 4)
 ```
 
+#### MAE
+
+```{r per-task-mae}
+#| fig-width: 16
+#| fig-height: 11
+#| fig-align: center
+#| column: screen-inset-shaded
+#| message: false
+#| error: false
+
+plot_scores(scores, "mae", include_featless = TRUE, logscale = FALSE, ncol = 4)
+```
+
+Without featureless learner
+
+```{r per-task-mae-no-featless}
+#| fig-width: 16
+#| fig-height: 11
+#| fig-align: center
+#| column: screen-inset-shaded
+#| message: false
+#| error: false
+
+plot_scores(scores, "mae", include_featless = FALSE, logscale = FALSE, ncol = 4)
+```
+
+#### RRSE
+
+```{r per-task-rrse}
+#| fig-width: 16
+#| fig-height: 11
+#| fig-align: center
+#| column: screen-inset-shaded
+#| message: false
+#| error: false
+
+plot_scores(scores, "rrse", include_featless = TRUE, logscale = FALSE, ncol = 4)
+```
+
+Without featureless learner
+
+```{r per-task-rrse-no-featless}
+#| fig-width: 16
+#| fig-height: 11
+#| fig-align: center
+#| column: screen-inset-shaded
+#| message: false
+#| error: false
+
+plot_scores(scores, "rrse", include_featless = FALSE, logscale = FALSE, ncol = 4)
+```
+
+:::
 
 ### Tuning Results
+
+```{r}
+plot_archive <- function(xdf, param) {
+  xdf |>
+    ggplot(aes(x = .data[[param]], y = rmse, color = learner_id, fill = learner_id)) +
+    facet_wrap(vars(task_label), scales = "free") +
+    geom_point(size = 2, alpha = .1, shape = 21, key_glyph = "rect") +
+    geom_smooth(se = FALSE, show.legend = FALSE) +
+    scale_color_brewer(palette = "Dark2", labels = learner_label, aesthetics = c("color", "fill")) +
+    scale_y_continuous(labels = scales::label_comma()) +
+    guides(fill = guide_legend(override.aes = list(alpha = .8))) +
+    labs(
+      title = glue::glue("RPF tuning archives for param `{param}`"),
+      subtitle = "Result of up to 200 evaluations of Bayesian optimization",
+      y = "RMSE", color = NULL, fill = NULL
+    ) +
+    theme_minimal() +
+    theme(
+      panel.spacing.x = unit(5, "mm"),
+      legend.position = "top",
+      plot.title.position = "plot"
+    )
+}
+```
+
 
 Showing best performing parameter combinations of the inner folds, e.g. the parameters that "won".
 One plot per hyperparameter, with performance on y-axis.
 
 Note that `max_interaction` is tuned by tuning `max_interaction_ratio` within [0, 1] and then calculating
 
-$$\max(\lceil \mathtt{max\_interaction\_ratio} \cdot \min(p, 30)\rceil, 1)$$
+$$\max(\lceil \mathtt{max\_interaction\_ratio} \cdot \min(p, 20)\rceil, 1)$$
 
-to effectively tune `max_interaction` within 1 and $p$ or 30, whichever is lower. 
-This is not ideal since multiple values for `max_interaction_ratio` could result in the same value for `max_interaction` for large $p$, but it's a compromise.
+to effectively tune `max_interaction` within 1 and $p$ or 20, whichever is lower. 
+This is not ideal since multiple values for `max_interaction_ratio` could result in the same value for `max_interaction` for small $p$, but it's a compromise.
 
-```{r tuning-results, eval = FALSE}
+```{r tuning-results}
 #| fig-width: 12
 #| fig-height: 7
 #| fig-align: center
 #| column: screen-inset-shaded
+#| message: false
+#| error: false
+#| warning: false
 
-tuning_results_rpf |>
-  ggplot(aes(x = splits, y = regr.mse, color = learner_name)) +
-  facet_wrap(vars(task_name)) +
-  geom_point(size = 2, alpha = .75) +
-  scale_color_brewer(palette = "Dark2") +
-  labs(
-    title = "Regression tuning results",
-    subtitle = "Tuned on MSE"
-  ) +
-  theme_minimal() +
-  theme(
-    panel.spacing.x = unit(1, "cm"),
-    legend.position = "bottom"
-  )
-
-
+plot_archive(results_rpf, "splits")
+plot_archive(results_rpf, "split_try")
+plot_archive(results_rpf, "t_try")
+plot_archive(results_rpf, "max_interaction")
 ```
+
+### Tuning archives
+
+Showing all evaluated hyperparameter configurations to get an impression of the space the MBO algorithm explored.
+
+```{r tuning-archives}
+#| fig-width: 12
+#| fig-height: 7
+#| fig-align: center
+#| column: screen-inset-shaded
+#| message: false
+#| error: false
+#| warning: false
+
+plot_archive(archives_rpf, "splits")
+plot_archive(archives_rpf, "split_try")
+plot_archive(archives_rpf, "t_try")
+plot_archive(archives_rpf, "max_interaction")
+```
+

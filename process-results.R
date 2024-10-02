@@ -6,18 +6,6 @@ if (!fs::dir_exists(conf$result_path)) {
   fs::dir_create(conf$result_path, recurse = TRUE)
 }
 
-save_archive <- function(archive, name) {
-  path <- fs::path(conf$result_path, glue::glue("tuning_archive_{name}"), ext = "rds")
-  cli::cli_alert_info("Saving {.val {deparse(substitute(archive))}} to {.file {fs::path_rel(path)}}")
-  saveRDS(archive, path)
-}
-
-save_results <- function(archive, name) {
-  path <- fs::path(conf$result_path, glue::glue("tuning_results_{name}"), ext = "rds")
-  cli::cli_alert_info("Saving {.val {deparse(substitute(archive))}} to {.file {fs::path_rel(path)}}")
-  saveRDS(archive, path)
-}
-
 save_obj <- function(obj, prefix = "", name, postfix = "") {
   path <- fs::path(conf$result_path, glue::glue("{prefix}_{name}_{postfix}"), ext = "rds")
   cli::cli_alert_info("Saving {.val {deparse(substitute(obj))}} to {.file {fs::path_rel(path)}}")
@@ -26,7 +14,8 @@ save_obj <- function(obj, prefix = "", name, postfix = "") {
 
 
 reg <- loadRegistry(conf$reg_dir, writeable = FALSE)
-tab <- ljoin(unwrap(getJobTable()), readRDS("task_meta.rds"), by = "task_id")
+task_meta <- readRDS("task_meta.rds")
+tab <- ljoin(unwrap(getJobTable()), task_meta, by = "task_id")
 data.table::setkey(tab, job.id)
 save_obj(tab, name = "jobs")
 
@@ -94,6 +83,10 @@ archives_rpf <- tuning_archives[
  .(learner_id, experiment, task_id, iteration, splits, split_try, t_try, max_interaction_ratio, regr.mse,
    runtime_learners, timestamp, warnings, errors, batch_nr)]
 
+archives_rpf <- merge(archives_rpf, task_meta, by = "task_id")
+archives_rpf[, rmse := sqrt(regr.mse)]
+archives_rpf[, max_interaction = ifelse(learner_id == "rpf", pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1), 2)]
+
 archives_xgb <- tuning_archives[
   startsWith(learner_id, "xgb"),
   .(learner_id, experiment, task_id, iteration, regr.xgboost.max_depth, regr.xgboost.subsample,
@@ -122,6 +115,10 @@ tuning_results <- extract_inner_tuning_results(bmr)
 results_rpf <- tuning_results[
   startsWith(learner_id, "rpf"),
   .(learner_id, experiment, task_id, iteration, splits, split_try, t_try, max_interaction_ratio, regr.mse)]
+
+results_rpf <- merge(results_rpf, task_meta, by = "task_id")
+results_rpf[, rmse := sqrt(regr.mse)]
+results_rpf[, max_interaction = ifelse(learner_id == "rpf", pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1), 2)]
 
 results_xgb <- tuning_results[
   startsWith(learner_id, "xgb"),
