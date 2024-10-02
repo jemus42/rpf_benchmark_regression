@@ -39,6 +39,10 @@ library(data.table)
 library(dplyr)
 library(kableExtra)
 
+jobs <- readRDS(fs::path(conf$result_path, "jobs", ext = "rds"))
+jobs[, time.hours := as.numeric(time.running, unit = "hours")]
+
+
 # Load task metadata
 task_meta <- readRDS("task_meta.rds")
 
@@ -88,6 +92,18 @@ set.seed(3) # Only for jitterdodge consistency
 - Outer resampling: 10-fold CV using the same resampling folds as [the CTR-23 paper](https://openreview.net/pdf?id=HebAOoMm94). Some tasks use multiple repetitions.
 - Bayesian optimization with 200 evaluations
 - A runtime limit of 7 days for each outer resampling fold (including tuning)
+
+### Status
+
+The number of completed jobs per learner.
+
+```{r job-status}
+jobs[, .(done = sum(!is.na(time.running)), total = .N), by = .(learner_id)]  |>
+  mutate(perc = scales::percent(done/total)) |>
+  arrange(done) |>
+  knitr::kable()
+```
+
 
 ### Hyperparameter Search Spaces
 
