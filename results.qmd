@@ -102,8 +102,51 @@ jobs[, .(done = sum(!is.na(time.running)), total = .N), by = .(learner_id)]  |>
   mutate(perc = scales::percent(done/total)) |>
   arrange(done) |>
   knitr::kable()
+
+# jobs[, .(done = sum(!is.na(time.running)), total = .N), by = .(task_id, learner_id)]  |>
+#   filter(done/total < 1) |>
+#   mutate(perc = scales::percent(done/total)) |>
+#   arrange(done) |>
+#   knitr::kable()
 ```
 
+```{r jobs-completion-history}
+jobs |>
+  arrange(done) |>
+  group_by(learner_id) |>
+  mutate(
+    cumdone = cumsum(!is.na(time.running)),
+    cumdone_rel = cumdone/n()
+  ) |>
+  ungroup() |>
+  filter(!is.na(time.running)) |>
+  # mutate(
+  #   time_rel = as.numeric(difftime(done, min(done), units = "days"))
+  # ) |>
+  #select(learner_id, done, time_rel)
+  ggplot(aes(x = done, y = cumdone_rel, color = learner_id)) +
+  geom_step(linewidth = 1.5, key_glyph = "rect") +
+  scale_x_datetime(
+    sec.axis = sec_axis(
+      transform = \(x) as.numeric(difftime(x, min(x), units = "days")), 
+      labels = as.numeric, 
+      name = "Days since start"
+    )
+  ) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_color_manual(breaks = learner_order, values = learner_cols, labels = learner_label) +
+  labs(
+    title = "Regression Benchmark Completion Rate",
+    subtitle = "Date of completion and days since benchmark start",
+    x = "Time of Completion", y = "Completion Rate",
+    color = NULL
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "bottom",
+    plot.title.position = "plot"
+  )
+```
 
 ### Hyperparameter Search Spaces
 
@@ -222,7 +265,6 @@ plot_aggr <- function(xdf,
 }
 ```
 
-
 #### Boxplot
 
 ::: {.panel-tabset}
@@ -271,7 +313,6 @@ Without featureless learner
 plot_aggr(aggr, include_featless = FALSE, logscale = TRUE, ncol = 1)
 ```
 
-
 :::
 
 #### Table
@@ -314,7 +355,6 @@ aggr |>
   # column_spec(4, "2.3cm") |>
   # column_spec(5, "3cm")
 ```
-
 
 ### Results per Task
 
@@ -474,7 +514,6 @@ plot_archive <- function(xdf, param) {
 }
 ```
 
-
 Showing only the best performing parameter combinations of the inner folds, e.g. the parameters that "won".
 One plot per hyperparameter, with performance on y-axis.
 
@@ -518,4 +557,3 @@ plot_archive(archives_rpf, "split_try")
 plot_archive(archives_rpf, "t_try")
 plot_archive(archives_rpf, "max_interaction")
 ```
-
