@@ -175,8 +175,9 @@ plot_aggr <- function(xdf,
       names_to = "measure",
       values_to = "score"
     ) |>
+    filter(!(measure == "rrse" & learner_id == "featureless")) |>
     mutate(
-      measure = factor(measure, levels = c("rmse", "rrse", "mae"))
+      measure = factor(measure, levels = c("rmse", "mae", "rrse"))
     )
 
   if (!include_featless) {
@@ -328,6 +329,11 @@ plot_scores <- function(xdf, measure = "rmse", include_featless = TRUE, logscale
     filter(.data$measure == toupper(.env$measure))
   
   if (!include_featless) {
+    xdf <- xdf |>
+      filter(learner_id != "featureless")
+  }
+  
+  if (measure == "rrse") {
     xdf <- xdf |>
       filter(learner_id != "featureless")
   }
