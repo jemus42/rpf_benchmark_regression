@@ -29,19 +29,15 @@ editor_options:
 ```{r setup}
 #| message: false
 #| warning: false
+
 library(ggplot2)
 library(ragg)
-library(mlr3)
-#library(mlr3batchmark)
-#library(mlr3viz)
-#library(mlr3tuning)
 library(data.table)
 library(dplyr)
 library(kableExtra)
 
 jobs <- readRDS(fs::path(conf$result_path, "jobs", ext = "rds"))
 jobs[, time.hours := as.numeric(time.running, unit = "hours")]
-
 
 # Load task metadata
 task_meta <- readRDS("task_meta.rds")
@@ -275,7 +271,7 @@ plot_aggr <- function(xdf,
 #| fig-width: 12
 #| fig-height: 7
 #| fig-align: center
-#| column: screen-inset-shaded
+# column: screen-inset-shaded
 
 plot_aggr(aggr, include_featless = TRUE, logscale = FALSE, ncol = 1)
 ```
@@ -286,7 +282,7 @@ Without featureless learner
 #| fig-width: 12
 #| fig-height: 7
 #| fig-align: center
-#| column: screen-inset-shaded
+# column: screen-inset-shaded
 
 plot_aggr(aggr, include_featless = FALSE, logscale = FALSE, ncol = 1)
 ```
@@ -297,7 +293,7 @@ plot_aggr(aggr, include_featless = FALSE, logscale = FALSE, ncol = 1)
 #| fig-width: 12
 #| fig-height: 7
 #| fig-align: center
-#| column: screen-inset-shaded
+# column: screen-inset-shaded
 
 plot_aggr(aggr, include_featless = TRUE, logscale = TRUE, ncol = 1)
 ```
@@ -308,7 +304,7 @@ Without featureless learner
 #| fig-width: 12
 #| fig-height: 7
 #| fig-align: center
-#| column: screen-inset-shaded
+# column: screen-inset-shaded
 
 plot_aggr(aggr, include_featless = FALSE, logscale = TRUE, ncol = 1)
 ```
@@ -414,9 +410,9 @@ Tasks ordered by $n \cdot p$, decreasing.
 #| fig-width: 16
 #| fig-height: 11
 #| fig-align: center
-#| column: screen-inset-shaded
 #| message: false
 #| error: false
+# column: screen-inset-shaded
 
 plot_scores(scores, "rmse", include_featless = TRUE, logscale = FALSE, ncol = 4)
 ```
@@ -427,9 +423,9 @@ Without featureless learner
 #| fig-width: 16
 #| fig-height: 11
 #| fig-align: center
-#| column: screen-inset-shaded
 #| message: false
 #| error: false
+# column: screen-inset-shaded
 
 plot_scores(scores, "rmse", include_featless = FALSE, logscale = FALSE, ncol = 4)
 ```
@@ -440,9 +436,9 @@ plot_scores(scores, "rmse", include_featless = FALSE, logscale = FALSE, ncol = 4
 #| fig-width: 16
 #| fig-height: 11
 #| fig-align: center
-#| column: screen-inset-shaded
 #| message: false
 #| error: false
+# column: screen-inset-shaded
 
 plot_scores(scores, "mae", include_featless = TRUE, logscale = FALSE, ncol = 4)
 ```
@@ -453,9 +449,9 @@ Without featureless learner
 #| fig-width: 16
 #| fig-height: 11
 #| fig-align: center
-#| column: screen-inset-shaded
 #| message: false
 #| error: false
+# column: screen-inset-shaded
 
 plot_scores(scores, "mae", include_featless = FALSE, logscale = FALSE, ncol = 4)
 ```
@@ -479,9 +475,9 @@ Without featureless learner
 #| fig-width: 16
 #| fig-height: 11
 #| fig-align: center
-#| column: screen-inset-shaded
 #| message: false
 #| error: false
+# column: screen-inset-shaded
 
 plot_scores(scores, "rrse", include_featless = FALSE, logscale = FALSE, ncol = 4)
 ```
@@ -528,10 +524,10 @@ This is not ideal since multiple values for `max_interaction_ratio` could result
 #| fig-width: 12
 #| fig-height: 7
 #| fig-align: center
-#| column: screen-inset-shaded
 #| message: false
 #| error: false
 #| warning: false
+# column: screen-inset-shaded
 
 plot_archive(results_rpf, "splits")
 plot_archive(results_rpf, "split_try")
@@ -547,10 +543,10 @@ Showing all evaluated hyperparameter configurations to get an impression of the 
 #| fig-width: 12
 #| fig-height: 7
 #| fig-align: center
-#| column: screen-inset-shaded
 #| message: false
 #| error: false
 #| warning: false
+# column: screen-inset-shaded
 
 plot_archive(archives_rpf, "splits")
 plot_archive(archives_rpf, "split_try")
