@@ -193,6 +193,28 @@ task_meta |>
   kable_styling()
 ```
 
+#### Completion by task
+
+```{r}
+jobs |>
+  filter(learner_id != "featureless") |>
+  mutate(is_done = !is.na(time.running)) |>
+  summarize(
+    perc_done = sum(is_done)/n(), 
+    .by = c("task_id", "learner_id")
+  ) |>
+  tidyr::pivot_wider(id_cols = c("task_id"), names_from = "learner_id", values_from = "perc_done") |>
+  mutate(
+    total = (rpf + rpf_fixdepth + xgb + xgb_fixdepth + ranger)/5
+  ) |>
+  arrange(-total) |>
+  mutate(across(where(is.numeric), scales::percent)) |>
+  left_join(task_meta, by = "task_id") |>
+  select(task_id, n, p, rpf:total) |>
+  knitr::kable(caption = "Proportion of completed jobs by learner and task") |>
+  kableExtra::kable_styling()
+```
+
 ## Regression Benchmark Results
 
 - Tuning on Mean Squared Error (MSE)
