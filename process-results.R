@@ -139,9 +139,9 @@ results_ranger <- tuning_results[
   learner_id == "ranger",
   .(learner_id, experiment, task_id, iteration, mtry.ratio, min.node.size, sample.fraction, regr.mse)]
 
-save_obj(archives_rpf,    name = "results", postfix = "rpf")
-save_obj(archives_xgb,    name = "results", postfix = "xgb")
-save_obj(archives_ranger, name = "results", postfix = "ranger")
+save_obj(results_rpf,    name = "results", postfix = "rpf")
+save_obj(results_xgb,    name = "results", postfix = "xgb")
+save_obj(results_ranger, name = "results", postfix = "ranger")
 tictoc::toc()
 
 cli::cli_alert_success("Done!")
