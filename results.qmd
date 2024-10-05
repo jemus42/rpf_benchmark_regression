@@ -146,7 +146,7 @@ jobs |>
 
 ### Hyperparameter Search Spaces
 
-### RPF / RPF (2)
+#### RPF / RPF (2)
 
 - `ntrees` := 50
 - `max_interaction` in [1, 20]
@@ -156,14 +156,14 @@ jobs |>
 - `splits_try` in [1, 20]
 - `t_try` in [0.1, 1]
 
-### ranger
+#### ranger
 
 - `num.trees` := 500
 - `mtry.ratio` in [0.1, 1]
 - `min.node.size` in [1, 50]
 - `sample.fracton` in [0.1, 1]
 
-### XGBoost / XGBoost (2)
+#### XGBoost / XGBoost (2)
 
 - Preprocessing of categorical features using treatment encoding
 - `max_depth` in [1, 20]
@@ -484,9 +484,9 @@ plot_scores(scores, "mae", include_featless = FALSE, logscale = FALSE, ncol = 4)
 #| fig-width: 16
 #| fig-height: 11
 #| fig-align: center
-#| column: screen-inset-shaded
 #| message: false
 #| error: false
+# column: screen-inset-shaded
 
 plot_scores(scores, "rrse", include_featless = TRUE, logscale = FALSE, ncol = 4)
 ```
