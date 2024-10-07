@@ -101,10 +101,16 @@ data.table::setnames(archives_xgb,
                      old = names_to_trim,
                      new = stringr::str_remove(names_to_trim, "^regr\\.xgboost\\."))
 
+archives_xgb <- merge(archives_xgb, task_meta, by = "task_id")
+archives_xgb[, rmse := sqrt(regr.mse)]
+
 archives_ranger <- tuning_archives[
   learner_id == "ranger",
   .(learner_id, experiment, task_id, iteration, mtry.ratio, min.node.size, sample.fraction,
     regr.mse, runtime_learners, timestamp, warnings, errors, batch_nr)]
+
+archives_ranger <- merge(archives_ranger, task_meta, by = "task_id")
+archives_ranger[, rmse := sqrt(regr.mse)]
 
 save_obj(archives_rpf,    name = "archives", postfix = "rpf")
 save_obj(archives_xgb,    name = "archives", postfix = "xgb")
