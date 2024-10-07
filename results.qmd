@@ -10,18 +10,18 @@ format:
     code-fold: true
     fig-align: center
     toc: true
-  pdf: 
-    documentclass: article
-    fig-align: center
-    toc: true
-    date: now
-    keep-tex: true
-    knitr: 
-      opts_chunk: 
-        echo: false
-        fig.pos: H
-    include-in-header: 
-      - \usepackage{float}
+  # pdf: 
+  #   documentclass: article
+  #   fig-align: center
+  #   toc: true
+  #   date: now
+  #   keep-tex: true
+  #   knitr: 
+  #     opts_chunk: 
+  #       echo: false
+  #       fig.pos: H
+  #   include-in-header: 
+  #     - \usepackage{float}
 editor_options: 
   chunk_output_type: console
 ---
@@ -57,6 +57,8 @@ scores <- task_meta[scores, on = c("task_id")]
 
 archives_rpf <- readRDS(fs::path(conf$result_path, "archives_rpf", ext = "rds"))
 results_rpf <- readRDS(fs::path(conf$result_path, "results_rpf", ext = "rds"))
+
+archives_xgb <- readRDS(fs::path(conf$result_path, "archives_xgb", ext = "rds"))
 
 # Define learner colors for somewhat identifiable plots
 learner_cols <- c(
@@ -107,6 +109,9 @@ jobs[, .(done = sum(!is.na(time.running)), total = .N), by = .(learner_id)]  |>
 ```
 
 ```{r jobs-completion-history}
+#| fig-width: 12
+#| fig-height: 7
+#| fig-align: center
 jobs |>
   arrange(done) |>
   group_by(learner_id) |>
@@ -277,7 +282,11 @@ plot_aggr <- function(xdf,
       labs(x = "Scores (log10)")
   } else {
     p <- p + scale_x_continuous(labels = scales::label_comma()) +
-      labs(x = "Scores", caption = glue::glue("{num_outliers} outlier scores above {outlier_threshold} are omitted"))
+      labs(x = "Scores")
+    
+    if (!identical(measures, "rrse")) {
+      p <- p + labs(caption = glue::glue("{num_outliers} outlier scores above {outlier_threshold} are omitted"))
+    }
   }
   p
 }
@@ -329,6 +338,21 @@ Without featureless learner
 # column: screen-inset-shaded
 
 plot_aggr(aggr, include_featless = FALSE, logscale = TRUE, ncol = 1)
+```
+
+##### Hybrid
+
+Mixed scales depending on measure
+
+```{r aggregated-hybrid}
+#| fig-width: 12
+#| fig-height: 7
+#| fig-align: center
+
+library(patchwork)
+plot_aggr(aggr, measures = "rmse", include_featless = TRUE, logscale = TRUE, ncol = 1) /
+  plot_aggr(aggr, measures = "mae", include_featless = TRUE, logscale = TRUE, ncol = 1) /
+  plot_aggr(aggr, measures = "rrse", include_featless = FALSE, logscale = FALSE, ncol = 1)
 ```
 
 :::
@@ -397,11 +421,11 @@ plot_scores <- function(xdf, measure = "rmse", include_featless = TRUE, logscale
   }
   
   p <- xdf |>
-    ggplot(aes(y = learner_id, x = score, fill = learner_id)) +
+    ggplot(aes(y = learner_id, x = score, fill = learner_id, color = learner_id)) +
     facet_wrap(vars(task_label), ncol = ncol, scales = "free") +
     geom_boxplot(alpha = .5) +
-    geom_point() +
-    scale_fill_manual(values = learner_cols, guide = "none") +
+    geom_jitter(shape = 21, stroke = .5, alpha = .15, size = 1) +
+    scale_fill_manual(values = learner_cols, guide = "none", aesthetics = c("color", "fill")) +
     scale_y_discrete(labels = learner_label) +
     labs(
       # title = "Scores per task",
@@ -480,7 +504,7 @@ plot_scores(scores, "mae", include_featless = FALSE, logscale = FALSE, ncol = 4)
 
 #### RRSE
 
-```{r per-task-rrse}
+```{r per-task-rrse, eval=FALSE}
 #| fig-width: 16
 #| fig-height: 11
 #| fig-align: center
