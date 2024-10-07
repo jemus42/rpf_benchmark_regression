@@ -138,9 +138,6 @@ results_xgb <- tuning_results[
   .(learner_id, experiment, task_id, iteration, regr.xgboost.max_depth, regr.xgboost.subsample,
     regr.xgboost.colsample_bytree, regr.xgboost.eta, regr.xgboost.nrounds, regr.mse)]
 results_xgb[, regr.xgboost.eta := exp(regr.xgboost.eta)] # due to tuning in logscale
-results_xgb <- merge(results_xgb, task_meta, by = "task_id")
-results_xgb[, rmse := sqrt(regr.mse)]
-results_xgb[, max_depth := fifelse(is.na(max_depth), 2, max_depth)]
 
 names_to_trim <- stringr::str_subset(names(results_xgb), "xgb")
 data.table::setnames(
@@ -148,6 +145,10 @@ data.table::setnames(
   old = names_to_trim,
   new = stringr::str_remove(names_to_trim, "^regr\\.xgboost\\.")
 )
+
+results_xgb <- merge(results_xgb, task_meta, by = "task_id")
+results_xgb[, rmse := sqrt(regr.mse)]
+results_xgb[, max_depth := fifelse(is.na(max_depth), 2, max_depth)]
 
 results_ranger <- tuning_results[
   learner_id == "ranger",
