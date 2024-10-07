@@ -104,6 +104,7 @@ data.table::setnames(archives_xgb,
 
 archives_xgb <- merge(archives_xgb, task_meta, by = "task_id")
 archives_xgb[, rmse := sqrt(regr.mse)]
+archives_xgb[, max_depth := fifelse(is.na(max_depth), 2, max_depth)]
 
 archives_ranger <- tuning_archives[
   learner_id == "ranger",
@@ -113,7 +114,7 @@ archives_ranger <- tuning_archives[
 archives_ranger <- merge(archives_ranger, task_meta, by = "task_id")
 archives_ranger[, rmse := sqrt(regr.mse)]
 archives_ranger[, mtry := ceiling(mtry.ratio * p)]
-results_ranger[, mtry.ratio := NULL]
+archives_ranger[, mtry.ratio := NULL]
 
 save_obj(archives_rpf,    name = "archives", postfix = "rpf")
 save_obj(archives_xgb,    name = "archives", postfix = "xgb")
@@ -139,6 +140,7 @@ results_xgb <- tuning_results[
 results_xgb[, regr.xgboost.eta := exp(regr.xgboost.eta)] # due to tuning in logscale
 results_xgb <- merge(results_xgb, task_meta, by = "task_id")
 results_xgb[, rmse := sqrt(regr.mse)]
+results_xgb[, max_depth := fifelse(is.na(max_depth), 2, max_depth)]
 
 names_to_trim <- stringr::str_subset(names(results_xgb), "xgb")
 data.table::setnames(
