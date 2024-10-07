@@ -88,6 +88,7 @@ archives_rpf <- tuning_archives[
 archives_rpf <- merge(archives_rpf, task_meta, by = "task_id")
 archives_rpf[, rmse := sqrt(regr.mse)]
 archives_rpf[, max_interaction := fifelse(learner_id == "rpf", pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1), 2)]
+archives_rpf[, max_interaction_ratio := NULL]
 
 archives_xgb <- tuning_archives[
   startsWith(learner_id, "xgb"),
@@ -111,6 +112,8 @@ archives_ranger <- tuning_archives[
 
 archives_ranger <- merge(archives_ranger, task_meta, by = "task_id")
 archives_ranger[, rmse := sqrt(regr.mse)]
+archives_ranger[, mtry := ceiling(mtry.ratio * p)]
+results_ranger[, mtry.ratio := NULL]
 
 save_obj(archives_rpf,    name = "archives", postfix = "rpf")
 save_obj(archives_xgb,    name = "archives", postfix = "xgb")
@@ -127,12 +130,15 @@ results_rpf <- tuning_results[
 results_rpf <- merge(results_rpf, task_meta, by = "task_id")
 results_rpf[, rmse := sqrt(regr.mse)]
 results_rpf[, max_interaction := fifelse(learner_id == "rpf", pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1), 2)]
+result_rpf[, max_interaction_ratio := NULL]
 
 results_xgb <- tuning_results[
   startsWith(learner_id, "xgb"),
   .(learner_id, experiment, task_id, iteration, regr.xgboost.max_depth, regr.xgboost.subsample,
     regr.xgboost.colsample_bytree, regr.xgboost.eta, regr.xgboost.nrounds, regr.mse)]
 results_xgb[, regr.xgboost.eta := exp(regr.xgboost.eta)] # due to tuning in logscale
+results_xgb <- merge(results_xgb, task_meta, by = "task_id")
+results_xgb[, rmse := sqrt(regr.mse)]
 
 names_to_trim <- stringr::str_subset(names(results_xgb), "xgb")
 data.table::setnames(
@@ -144,6 +150,10 @@ data.table::setnames(
 results_ranger <- tuning_results[
   learner_id == "ranger",
   .(learner_id, experiment, task_id, iteration, mtry.ratio, min.node.size, sample.fraction, regr.mse)]
+results_ranger <- merge(results_ranger, task_meta, by = "task_id")
+results_ranger[, rmse := sqrt(regr.mse)]
+results_ranger[, mtry := ceiling(mtry.ratio * p)]
+results_ranger[, mtry.ratio := NULL]
 
 save_obj(results_rpf,    name = "results", postfix = "rpf")
 save_obj(results_xgb,    name = "results", postfix = "xgb")
