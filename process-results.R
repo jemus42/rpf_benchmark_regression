@@ -131,7 +131,7 @@ results_rpf <- tuning_results[
 results_rpf <- merge(results_rpf, task_meta, by = "task_id")
 results_rpf[, rmse := sqrt(regr.mse)]
 results_rpf[, max_interaction := fifelse(learner_id == "rpf", pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1), 2)]
-result_rpf[, max_interaction_ratio := NULL]
+results_rpf[, max_interaction_ratio := NULL]
 
 results_xgb <- tuning_results[
   startsWith(learner_id, "xgb"),
