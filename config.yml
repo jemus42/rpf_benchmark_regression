@@ -4,6 +4,7 @@ default:
   reg_dir: !expr here::here("registries", reg_name)
   result_path: !expr here::here("results", reg_name)
   seed: 2024
+  # Initial limit on tasks to get from OpenML suite, dim = n * p
   task_dim_max: !expr 1e6
   learner_threads: 1 # Careful to adjust based on available hardware
   resampling:
@@ -36,34 +37,13 @@ default:
 production:
   reg_name: "production"
 
-production-parallel:
-  reg_name: "production-parallel"
-  learner_threads: 10
-
 trial:
   reg_name: "trial"
   tuning:
-    # budget = evals + n_params * multiplier
     evals: 10
     multiplier: 0
-    runtime: !expr 24 * 60 * 60 # expected in seconds
+    runtime: !expr 24 * 60 * 60
     tuner: "mbo"
   fallback:
     inner: true
-    outer: false
-
-debug:
-  reg_name: "debug"
-  resampling:
-    inner:
-      strategy: "holdout"
-    outer:
-      strategy: "OML"
-  tuning:
-    evals: 1
-    multiplier: 0
-    runtime: !expr 24 * 60 * 60 # expected in seconds
-    tuner: "random_search"
-  fallback:
-    inner: false
     outer: false

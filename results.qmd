@@ -208,9 +208,15 @@ jobs[!is.na(time.running),
 -   No features of type `logical` or `character`
 
 ```{r tasks}
-
-
-
+task_meta |>
+  arrange(dim) |>
+  select(task_id, n, p) |>
+  kbl(
+    caption = "Selected OpenML CTR-23 tasks, arranged by dimensionality",
+    col.names = c("Task", "n", "p"),
+    booktabs = TRUE
+  ) |>
+  kable_styling()
 ```
 
 #### Completion by task
