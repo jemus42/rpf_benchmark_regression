@@ -5,6 +5,7 @@ default:
   result_path: !expr here::here("results", reg_name)
   seed: 2024
   task_dim_max: !expr 1e6
+  learner_threads: 1 # Careful to adjust based on available hardware
   resampling:
     inner:
       strategy: "repeated_cv"
@@ -34,6 +35,10 @@ default:
 
 production:
   reg_name: "production"
+
+production-parallel:
+  reg_name: "production-parallel"
+  learner_threads: 10
 
 trial:
   reg_name: "trial"

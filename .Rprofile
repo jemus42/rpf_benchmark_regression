@@ -9,6 +9,10 @@ local({
 
 conf <- config::get()
 
+# Quick validation of some essentials
+checkmate::assert_number(conf$task_dim_max, lower = 1)
+num_threads <- checkmate::assert_integerish(conf$learner_threads, lower = 1)
+
 options(
   mlr3oml.cache = TRUE,
   datatable.print.class = TRUE,
@@ -16,7 +20,8 @@ options(
 )
 
 # Make parallelization behave
-Sys.setenv(OMP_NUM_THREADS = 1)
-Sys.setenv(OPENBLAS_NUM_THREADS = 1)
-Sys.setenv(OMP_THREAD_LIMIT = 1)
-Sys.setenv(MKL_NUM_THREADS = 1)
+Sys.setenv(OMP_NUM_THREADS = num_threads)
+Sys.setenv(OPENBLAS_NUM_THREADS = num_threads)
+Sys.setenv(OMP_THREAD_LIMIT = num_threads)
+Sys.setenv(MKL_NUM_THREADS = num_threads)
+rm(num_threads)

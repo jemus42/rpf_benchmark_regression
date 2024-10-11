@@ -90,6 +90,7 @@ learners <- list(
 
   rpf = wrap_autotuner(
     learner_id = "regr.rpf",
+    nthreads = conf$learner_threads,
     ntrees = 50,
     max_interaction_limit = 20,
     search_space = ps(
@@ -104,6 +105,7 @@ learners <- list(
 
   rpf_fixdepth = wrap_autotuner(
     learner_id = "regr.rpf",
+    nthreads = conf$learner_threads,
     ntrees = 50,
     max_interaction = 2,
     search_space = ps(
@@ -117,6 +119,7 @@ learners <- list(
 
   xgb = wrap_autotuner(
     learner_id = "regr.xgboost",
+    nthread = conf$learner_threads,
     # early_stopping_rounds = 50,
     # eval_metric = "rmse",
     .encode = TRUE,
@@ -135,6 +138,7 @@ learners <- list(
 
   xgb_fixdepth = wrap_autotuner(
     learner_id = "regr.xgboost",
+    nthread = conf$learner_threads,
     max_depth = 2,
     # early_stopping_rounds = 50,
     # eval_metric = "rmse",
@@ -152,7 +156,9 @@ learners <- list(
   ,
 
   ranger = wrap_autotuner(
-    learner_id = "regr.ranger", num.trees = 500,
+    learner_id = "regr.ranger",
+    num.threads = conf$learner_threads,
+    num.trees = 500,
     search_space = ps(
       mtry.ratio      = p_dbl(0.1, 1),
       min.node.size   = p_int(1, 50),
