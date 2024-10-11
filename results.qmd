@@ -178,7 +178,7 @@ jobs[!is.na(time.running),
 -   `max_interaction` in \[1, 20\]
     -   Via `max_interaction_ratio` in \[0, 1\] and `max_interaction_limit` := 20
     -   for **RPF (2)**: `max_interaction` := 2
--   `splits` in \[10, 200\]
+-   `splits` in \[10, 100\]
 -   `split_try` in \[1, 20\]
 -   `t_try` in \[0.1, 1\]
 
@@ -199,17 +199,6 @@ jobs[!is.na(time.running),
 -   `eta` in \[0.0001, 1\] (log scale)
 -   `nrounds` in \[10, 5000\]
 
-| Learner | Parameter search space |
-|----------------|-----------------------------------------------------------|
-| RPF | `ntrees = 50`, `max_interaction` in \[1, 20\], `splits` in \[10, 100\], `split_try` in \[1, 20\], t_tryin \[0.1, 1\] \| |
-| RPF (2) | Same as RPF, with `max_interaction = 2` |
-| XGBoost | `max_depth` in \[1, 20\], `subsample` in \[0.1, 1\], `colsample_bytree` in \[0.1, 1\], `eta` in \[0.0001, 1\], `nrounds` in \[10, 5000\] |
-| XGBoost (2) | Sames as XGBoost, with `max_depth = 2` |
-| ranger | `num.trees` = 500, mtry.`ratio` in \[0.1, 1\], `min.node.size` in \[1, 50\], `sample.fraction` in \[0.1, 1\] |
-| Featureless | Always predicts mean |
-
-: Learners and search spaces
-
 ### Tasks
 
 [OpenML CTR-23](https://www.openml.org/search?type=study&study_type=task&sort=tasks_included&id=353) tasks with:
@@ -219,15 +208,9 @@ jobs[!is.na(time.running),
 -   No features of type `logical` or `character`
 
 ```{r tasks}
-task_meta |>
-  arrange(dim) |>
-  select(task_id, n, p) |>
-  kbl(
-    caption = "Selected OpenML CTR-23 tasks, arranged by dimensionality",
-    col.names = c("Task", "n", "p"),
-    booktabs = TRUE
-  ) |>
-  kable_styling()
+
+
+
 ```
 
 #### Completion by task
@@ -606,7 +589,7 @@ Tasks ordered by $n \cdot p$, decreasing.
 
 ```{r per-task-rmse}
 #| fig-width: 13
-#| fig-height: 11
+#| fig-height: 6
 #| fig-align: center
 #| message: false
 #| error: false
@@ -622,7 +605,7 @@ plot_scores(scores, "rmse", include_featless = TRUE, logscale = FALSE, ncol = 4)
 
 ```{r per-task-mae}
 #| fig-width: 13
-#| fig-height: 11
+#| fig-height: 6
 #| fig-align: center
 #| message: false
 #| error: false
@@ -635,7 +618,7 @@ plot_scores(scores, "mae", include_featless = TRUE, logscale = FALSE, ncol = 4)
 
 ```{r per-task-rrse-no-featless}
 #| fig-width: 13
-#| fig-height: 11
+#| fig-height: 6
 #| fig-align: center
 #| message: false
 #| error: false

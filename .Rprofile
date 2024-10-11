@@ -11,6 +11,7 @@ conf <- config::get()
 
 # Quick validation of some essentials
 checkmate::assert_number(conf$task_dim_max, lower = 1)
+checkmate::assert_subset(conf$tuning$tuner, choices = c("random_search", "mbo"))
 num_threads <- checkmate::assert_integerish(conf$learner_threads, lower = 1)
 
 options(

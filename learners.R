@@ -6,8 +6,6 @@ if (FALSE) {
   requireNamespace("callr") # For encapsulation
 }
 
-checkmate::assert_subset(conf$tuning$tuner, choices = c("random_search", "mbo"))
-
 if (conf$tuning$tuner == "mbo") {
   library(mlr3mbo)
 
@@ -30,6 +28,7 @@ wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
   }
 
   # Used for XGBoost learners to enable internal tuning / early stopping using test set
+  # Disabled due to bug for now
   # if ("validation" %in% base_learner$properties) {
   #   cli::cli_alert_info("Setting validation for {.val {learner_id}}")
   #   set_validate(base_learner, "test")
@@ -95,7 +94,7 @@ learners <- list(
     max_interaction_limit = 20,
     search_space = ps(
       max_interaction_ratio = p_dbl(0, 1),
-      splits    = p_int(10, 200),
+      splits    = p_int(10, 100),
       split_try = p_int(1, 20),
       t_try     = p_dbl(0.1, 1)
     )
@@ -109,7 +108,7 @@ learners <- list(
     ntrees = 50,
     max_interaction = 2,
     search_space = ps(
-      splits    = p_int(10, 200),
+      splits    = p_int(10, 100),
       split_try = p_int(1, 20),
       t_try     = p_dbl(0.1, 1)
     )
