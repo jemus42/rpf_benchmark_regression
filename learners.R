@@ -44,8 +44,10 @@ wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
     }
   }
 
-  base_learner$timeout = c(train   = conf$timeout$base$train  * 3600,
-                           predict = conf$timeout$base$predict * 3600)
+  base_learner$timeout = c(
+    train   = conf$timeout$base$train  * 3600,
+    predict = conf$timeout$base$predict * 3600
+  )
 
   at <- auto_tuner(
     learner = base_learner,
@@ -59,6 +61,7 @@ wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
     ),
     measure = msr("regr.mse"),
     search_space = search_space,
+    # Terminate after evals XOR time limit
     terminator = trm("combo", list(
       trm("run_time", secs = conf$tuning$runtime),
       trm("evals", n_evals = conf$tuning$evals, k = conf$tuning$multiplier)
@@ -78,8 +81,11 @@ wrap_autotuner <- function(learner_id, ..., search_space, .encode = FALSE) {
     }
   }
 
-  at$timeout = c(train   = conf$timeout$autotuner$train  * 3600,
-                 predict = conf$timeout$autotuner$predict * 3600)
+  # Kill switch for long-running jobs
+  at$timeout = c(
+    train   = conf$timeout$autotuner$train  * 3600,
+    predict = conf$timeout$autotuner$predict * 3600
+  )
 
   at
 

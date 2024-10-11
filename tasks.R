@@ -13,13 +13,6 @@ omltasks = lapply(collection$task_ids, \(id) otsk(id))
 tasks = lapply(omltasks, \(learner) as_task(learner))
 names(tasks) = mlr3misc::ids(tasks)
 
-# all_feature_types <- sapply(tasks, \(task) {
-#   unique(task$feature_types$type)
-# }) |>
-#   unlist() |>
-#   unique() |>
-#   sort()
-
 task_meta <- data.table::rbindlist(lapply(tasks, \(task) {
 
   x <- task$data(cols = task$feature_names)
