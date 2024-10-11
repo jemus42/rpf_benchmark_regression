@@ -50,21 +50,16 @@ trial:
     tuner: "mbo"
   fallback:
     inner: true
-    outer: true
+    outer: false
 
 debug:
   reg_name: "debug"
   resampling:
     inner:
-      strategy: "cv"
-      folds: 3
-      repeats: 2
+      strategy: "holdout"
     outer:
-      strategy: "OML" # "OML" uses existing resamplings, otherwise creat enew mlr3 resampling
-      # folds: 3
-      # repeats: 2
+      strategy: "OML"
   tuning:
-    # budget = evals + n_params * multiplier
     evals: 1
     multiplier: 0
     runtime: !expr 24 * 60 * 60 # expected in seconds

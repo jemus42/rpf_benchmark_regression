@@ -20,8 +20,8 @@ format:
       opts_chunk:
         echo: false
         fig.pos: H
-    include-in-header:
-      - \usepackage{float}
+    # include-in-header:
+    #   - \usepackage{float}
 editor_options: 
   chunk_output_type: console
 ---
@@ -73,26 +73,38 @@ learner_cols <- c(
 learner_order <- names(learner_cols)
 learner_label <- function(x) {
   x <- as.character(x)
-  ret <- c("rpf" = "RPF", "xgb" = "XGBoost", "rpf_fixdepth" = "RPF (2)", "xgb_fixdepth" = "XGBoost (2)", "ranger" = "ranger", "featureless" = "Featureless")[x]
+  ret <- c("rpf" = "rpf", "xgb" = "xgboost", "rpf_fixdepth" = "rpf (2)", "xgb_fixdepth" = "xgboost (2)", "ranger" = "rf", "featureless" = "average")[x]
   unname(ret)
 }
+learner_order_labelled <- learner_label(learner_order)
 
 # aggr[, learner_label := learner_label(learner_id)]
 # scores[, learner_label := learner_label(learner_id)]
 aggr[, learner_id := factor(learner_id, levels = rev(learner_order))]
 scores[, learner_id := factor(learner_id, levels = rev(learner_order))]
 
-scores <- scores[dim <= 1e5]
-aggr <- aggr[dim <= 1e5]
-
-
 set.seed(3) # Only for jitterdodge consistency
 ```
+
+```{r task-subselection}
+tasks_keep <- as.character(task_meta[dim_rank <= 12, task_id])
+
+task_meta <- task_meta[task_id %in% tasks_keep, ]
+scores <- scores[task_id %in% tasks_keep, ]
+aggr <- aggr[task_id %in% tasks_keep, ]
+
+results_rpf <- results_rpf[task_id %in% tasks_keep, ]
+archives_rpf <- archives_rpf[task_id %in% tasks_keep, ]
+archives_ranger <- archives_ranger[task_id %in% tasks_keep, ]
+archives_xgb <- archives_xgb[task_id %in% tasks_keep, ]
+```
+
 
 ## Benchmark Setup
 
 -   Inner resampling: 2x3-fold repeated CV
--   Outer resampling: 10-fold CV using the same resampling folds as [the CTR-23 paper](https://openreview.net/pdf?id=HebAOoMm94). Some tasks use multiple repetitions.
+-   Outer resampling: 10-fold CV using the same resampling folds as [the CTR-23 paper](https://openreview.net/pdf?id=HebAOoMm94).
+      - Tasks use 10x10-fold CV if N <= 1000, 10-fold CV otherwise
 -   Bayesian optimization with 200 evaluations
 -   A runtime limit of 7 days for each outer resampling fold (including tuning)
 
@@ -105,18 +117,13 @@ jobs[, .(done = sum(!is.na(time.running)), total = .N), by = .(learner_id)]  |>
   mutate(perc = scales::percent(done/total)) |>
   arrange(done) |>
   knitr::kable()
-
-# jobs[, .(done = sum(!is.na(time.running)), total = .N), by = .(task_id, learner_id)]  |>
-#   filter(done/total < 1) |>
-#   mutate(perc = scales::percent(done/total)) |>
-#   arrange(done) |>
-#   knitr::kable()
 ```
 
 ```{r jobs-completion-history}
 #| fig-width: 10
 #| fig-height: 7
 #| fig-align: center
+
 jobs |>
   arrange(done) |>
   group_by(learner_id) |>
@@ -154,6 +161,15 @@ jobs |>
   )
 ```
 
+
+```{r}
+jobs[!is.na(time.running), 
+     .(time.hours = mean(time.hours), 
+       mem.used = mean(mem.used, na.rm = TRUE)), 
+     by = .(learner_id, task_id)]
+```
+
+
 ### Hyperparameter Search Spaces
 
 #### RPF / RPF (2)
@@ -162,7 +178,7 @@ jobs |>
 -   `max_interaction` in \[1, 20\]
     -   Via `max_interaction_ratio` in \[0, 1\] and `max_interaction_limit` := 20
     -   for **RPF (2)**: `max_interaction` := 2
--   `splits` in \[10, 100\]
+-   `splits` in \[10, 200\]
 -   `split_try` in \[1, 20\]
 -   `t_try` in \[0.1, 1\]
 
@@ -199,18 +215,17 @@ jobs |>
 [OpenML CTR-23](https://www.openml.org/search?type=study&study_type=task&sort=tasks_included&id=353) tasks with:
 
 -   No missing values
--   $n \cdot p \leq 10^5$
+-   $n \cdot p \leq 10^6$
 -   No features of type `logical` or `character`
 
 ```{r tasks}
 task_meta |>
   arrange(dim) |>
-  filter(n * p <= 1e5) |>
   select(task_id, n, p) |>
   kbl(
     caption = "Selected OpenML CTR-23 tasks, arranged by dimensionality",
     col.names = c("Task", "n", "p"),
-    booktabs = TRUE#, format = "latex"
+    booktabs = TRUE
   ) |>
   kable_styling()
 ```
@@ -218,7 +233,7 @@ task_meta |>
 #### Completion by task
 
 ```{r}
-jobs |>
+task_completion <- jobs |>
   filter(learner_id != "featureless") |>
   mutate(is_done = !is.na(time.running)) |>
   summarize(
@@ -230,15 +245,29 @@ jobs |>
     total = (rpf + rpf_fixdepth + xgb + xgb_fixdepth + ranger)/5
   ) |>
   left_join(task_meta[, .(task_id, n, p)], by = "task_id") |>
-  arrange(n * p) |>
-  #filter(n * p <= 1e5) |>
-  select(-n, -p) |>
-  mutate(across(where(is.numeric), scales::percent)) |>
-  left_join(task_meta, by = "task_id") |>
-  select(task_id, n, p, rpf:total) |>
+  arrange(n * p)
+
+task_completion |>
+  mutate(across(rpf:total, scales::percent)) |>
   kableExtra::kbl(caption = "Proportion of completed jobs by learner and task") |>
   kableExtra::kable_styling()
 ```
+
+```{r subset-to-completed-tasks}
+completed_tasks <- task_completion |>
+  filter(total == 1)
+
+task_completion |>
+  filter(total < 1) |>
+  mutate(across(rpf:total, scales::percent)) |>
+  kableExtra::kbl(caption = "Tasks with incomplete results") |>
+  kableExtra::kable_styling()
+
+# task_meta <- task_meta[task_id %in% completed_tasks$task_id, ]
+# scores <- scores[task_id %in% completed_tasks$task_id, ]
+# aggr <- aggr[task_id %in% completed_tasks$task_id, ]
+```
+
 
 ## Regression Benchmark Results
 
@@ -314,63 +343,11 @@ plot_aggr <- function(xdf,
 
 #### Boxplot
 
-<!--
-::: panel-tabset
-
-
-##### Regular
-
-```{r aggregated}
-#| fig-width: 12
-#| fig-height: 7
-#| fig-align: center
-# column: screen-inset-shaded
-
-plot_aggr(aggr, include_featless = TRUE, logscale = FALSE, ncol = 1)
-```
-
-Without featureless learner
-
-```{r aggregated-no-featless}
-#| fig-width: 12
-#| fig-height: 7
-#| fig-align: center
-# column: screen-inset-shaded
-
-plot_aggr(aggr, include_featless = FALSE, logscale = FALSE, ncol = 1)
-```
-
-##### Log Scale
-
-```{r aggregated-logscale}
-#| fig-width: 12
-#| fig-height: 7
-#| fig-align: center
-# column: screen-inset-shaded
-
-plot_aggr(aggr, include_featless = TRUE, logscale = TRUE, ncol = 1)
-```
-
-Without featureless learner
-
-```{r aggregated-logscale-no-featless}
-#| fig-width: 12
-#| fig-height: 7
-#| fig-align: center
-# column: screen-inset-shaded
-
-plot_aggr(aggr, include_featless = FALSE, logscale = TRUE, ncol = 1)
-```
-
-##### Hybrid
-
--->
-
 Mixed scales depending on measure
 
-```{r aggregated-hybrid}
+```{r aggregated-hybrid-rmse-mae}
 #| fig-width: 7
-#| fig-height: 5
+#| fig-height: 4
 #| fig-align: center
 
 library(patchwork)
@@ -427,6 +404,16 @@ p2 <- xtemp |>
       plot.title.position = "plot"
     )
 
+p1 / p2
+
+```
+
+
+```{r aggregated-rrse}
+#| fig-width: 7
+#| fig-height: 1.75
+#| fig-align: center
+
 p3 <- xtemp |>
     filter(measure == "RRSE") |>
     ggplot(aes(y = learner_id, x = score, fill = learner_id)) +
@@ -435,7 +422,11 @@ p3 <- xtemp |>
       position = position_jitterdodge(dodge.width = .5),
       shape = 21, stroke = .1, size = 2
     ) +
-    scale_x_continuous(guide = guide_axis(position = "top"), labels = scales::label_percent(accuracy = 1)) +
+    scale_x_continuous(
+      guide = guide_axis(position = "top"), 
+      labels = scales::label_percent(accuracy = 1), 
+      limits = c(0, 1)
+    ) +
     scale_y_discrete(labels = learner_label) +
     scale_fill_manual(values = learner_cols, guide = "none") +
     labs(
@@ -447,6 +438,14 @@ p3 <- xtemp |>
       plot.title.position = "plot"
     )
 
+p3
+```
+
+
+```{r aggregated-hybrid-combined}
+#| fig-width: 7
+#| fig-height: 5
+#| fig-align: center
 p1 / p2 / p3
 ```
 
@@ -493,8 +492,10 @@ aggr |>
 -->
 
 ```{r aggregated-table-median}
-aggr |>
-  mutate(rrse = 100 * rrse) |>
+aggr_tab <- aggr |>
+  mutate(
+    rrse = if_else(learner_id == "featureless", 100, 100 * rrse)
+  ) |>
   tidyr::pivot_longer(
     cols = any_of(c("rmse", "mae", "rrse")),
     names_to = "measure", names_transform = toupper,
@@ -515,13 +516,27 @@ aggr |>
     median = glue::glue("{median} [{q25}; {q75}]")
   ) |>
   select(-q25, -q75) |>
-  tidyr::pivot_wider(names_from = measure, names_sep = "_", values_from = median) |>
+  tidyr::pivot_wider(names_from = measure, names_sep = "_", values_from = median)
+
+aggr_tab |>
   select(learner_id, contains(toupper(c("rmse", "mae", "rrse")))) |>
   arrange(desc(learner_id)) |>
   mutate(learner_id = learner_label(learner_id)) |>
   kbl(
     col.names = c("Learner", "RMSE", "MAE", "RRSE (%)"),
     caption = "Median [q25, q75] of scores over all datasets and outer resampling iterations",
+    booktabs = TRUE,
+  ) |>
+  kable_styling(latex_options = c("hold_position"))
+
+aggr_tab |>
+  select(learner_id, RRSE) |>
+  filter(learner_id != "featureless") |>
+  arrange(desc(learner_id)) |>
+  mutate(learner_id = learner_label(learner_id)) |>
+  kbl(
+    col.names = c("Learner", "RRSE (%)"),
+    caption = "Median [q25, q75] of RRSE over all datasets and outer resampling iterations",
     booktabs = TRUE,
   ) |>
   kable_styling(latex_options = c("hold_position"))
@@ -547,7 +562,10 @@ plot_scores <- function(xdf, measure = "rmse", include_featless = TRUE, logscale
   
   if (measure == "rrse") {
     xdf <- xdf |>
-      filter(learner_id != "featureless")
+      filter(learner_id != "featureless") |>
+      mutate(score = 100 * score)
+    
+    measure <- "RRSE (%)"
   }
   
   p <- xdf |>
@@ -587,61 +605,65 @@ Tasks ordered by $n \cdot p$, decreasing.
 #### RMSE
 
 ```{r per-task-rmse}
-#| fig-width: 8.5
-#| fig-height: 8
+#| fig-width: 13
+#| fig-height: 11
 #| fig-align: center
 #| message: false
 #| error: false
 # column: screen-inset-shaded
 
-plot_scores(scores, "rmse", include_featless = TRUE, logscale = FALSE)
+plot_scores(scores, "rmse", include_featless = TRUE, logscale = FALSE, ncol = 4)
+
+# ggsave("tmp.png", plot = p, width = 13, height = 11, bg = "white")
 ```
 
 
 #### MAE
 
 ```{r per-task-mae}
-#| fig-width: 10
-#| fig-height: 8.5
+#| fig-width: 13
+#| fig-height: 11
 #| fig-align: center
 #| message: false
 #| error: false
 # column: screen-inset-shaded
 
-plot_scores(scores, "mae", include_featless = TRUE, logscale = FALSE)
+plot_scores(scores, "mae", include_featless = TRUE, logscale = FALSE, ncol = 4)
 ```
 
 #### RRSE
 
 ```{r per-task-rrse-no-featless}
-#| fig-width: 10
-#| fig-height: 8.5
+#| fig-width: 13
+#| fig-height: 11
 #| fig-align: center
 #| message: false
 #| error: false
 # column: screen-inset-shaded
 
-plot_scores(scores, "rrse", include_featless = FALSE, logscale = FALSE)
+plot_scores(scores, "rrse", include_featless = FALSE, logscale = FALSE, ncol = 4)
 ```
 :::
 
 #### Runtime vs Performance
 
+Jobs were distributed across different cluster partitions with varying performance, which makes runtimes below less comparable than desired, but some rough trends should be visible.
+
 ```{r scores-runtime-rrse}
-#| fig-width: 10
-#| fig-height: 8.5
+#| fig-width: 13
+#| fig-height: 11
 #| fig-align: center
 #|
 scores_runtime <- inner_join(
   scores,
-  jobs[dim <= 1e5, .(task_id, learner_id, repl, time.hours)],
+  jobs[, .(task_id, learner_id, repl, time.hours)],
   by = c("task_id", "learner_id", "iteration" = "repl")
 ) |>
   filter(learner_id != "featureless")
 
 scores_runtime |>
   ggplot(aes(x = time.hours, y = rrse, color = learner_id, fill = learner_id)) +
-  facet_wrap(vars(task_label), scales = "free", ncol = 3) +
+  facet_wrap(vars(task_label), scales = "free", ncol = 4) +
   geom_point(alpha = .5, key_glyph = "rect") +
   scale_x_log10() +
   scale_y_continuous(labels = scales::label_percent()) +
@@ -660,7 +682,7 @@ scores_runtime |>
   )
 ```
 
-```{r}
+```{r, eval=FALSE}
 lm(log(time.hours) ~ n:p + learner_id, data = scores_runtime) |>
   broom::tidy(exponentiate = TRUE, conf.int = TRUE)
 
@@ -674,7 +696,6 @@ scores_runtime |>
 ```
 
 
-
 ### Tuning Results
 
 ```{r fun-plot_archive}
@@ -682,10 +703,9 @@ plot_archive <- function(xdf, param, log_y = FALSE, log_x = FALSE, outlier_thres
   
   p <- xdf |>
     filter(rmse <= quantile(rmse, probs = outlier_threshold_percentile), .by = "task_id") |>
-    filter(dim <= 1e5) |>
     mutate(task_label = reorder(task_label, dim)) |>
     ggplot(aes(x = .data[[param]], y = rmse, color = learner_id, fill = learner_id)) +
-    facet_wrap(vars(task_label), scales = "free", ncol = 3) +
+    facet_wrap(vars(task_label), scales = "free", ncol = 4) +
     geom_point(size = 2, alpha = .1, shape = 21, key_glyph = "rect") +
     geom_smooth(se = FALSE, show.legend = FALSE, method = "lm") +
     scale_color_brewer(palette = "Dark2", labels = learner_label, aesthetics = c("color", "fill")) +
@@ -733,8 +753,8 @@ to effectively tune `max_interaction` within 1 and $p$ or 20, whichever is lower
 This is not ideal since multiple values for `max_interaction_ratio` could result in the same value for `max_interaction` for small $p$, but it's a compromise.
 
 ```{r tuning-results}
-#| fig-width: 12
-#| fig-height: 7
+#| fig-width: 13
+#| fig-height: 11
 #| fig-align: center
 #| message: false
 #| error: false
@@ -747,15 +767,72 @@ plot_archive(results_rpf, "t_try")
 plot_archive(results_rpf, "max_interaction")
 ```
 
+#### Winning `splits`
+
+```{r tuning-results-rpf-splits-tab}
+results_rpf[, .(task_id, splits)][, .(median_splits = median(splits)), by = .(task_id)][task_meta, on = "task_id"] |>
+  arrange(dim_rank) |>
+  select(task_id, n, p, dim_rank, median_splits) |>
+  kableExtra::kbl(
+    caption = "Winning number of splits per task, median over resampling iterations"
+  ) |>
+  kableExtra::kable_styling()
+```
+
+
 ### Tuning Archives
 
 Showing all evaluated hyperparameter configurations to get an impression of the space the MBO algorithm explored.
 
+#### Effective Budgets
+
+Since tuning budgets was _either_ 200 evaluations _or_ a tuning time of 6 days, the number of evaluations per learner/task varies.
+
+Average number of evaluations for learner and task combinations, where the average is taken across resamplings:
+
+```{r}
+data.table::rbindlist(
+  list(
+    archives_rpf[, .N, by = .(learner_id, task_id, iteration)],
+    archives_ranger[, .N, by = .(learner_id, task_id, iteration)],
+    archives_xgb[, .N, by = .(learner_id, task_id, iteration)]
+  )
+) |>
+  summarize(
+    median = median(N),
+    min_max = if_else(min(N) == max(N), "-", glue::glue("{min(N)} - {max(N)}")),
+    fmt = glue::glue("{median} ({min_max})"),
+    .by = c("task_id", "learner_id")
+  ) |>
+  arrange(task_id) |>
+  left_join(
+    task_meta[, .(task_id, task_label)],
+    by = "task_id"
+  ) |>
+  mutate(
+    learner_id = learner_label(learner_id),
+    learner_id = factor(learner_id, levels = learner_order_labelled),
+  ) |>
+  tidyr::pivot_wider(
+    id_cols = c("task_label"), 
+    names_from = "learner_id", 
+    names_sort = TRUE,
+    values_from = fmt
+  ) |>
+  arrange(task_label) |>
+  rename(Task = task_label) |>
+  kableExtra::kable(
+    caption = "Median (min - max) number of tuning evaluations per learner and task. (-) denotes a constant number of evaluations across resampling iterations."
+  ) |>
+  kableExtra::kable_styling()
+```
+
+
 #### RPF / RPF (2)
 
-```{r tuning-archives-rpf}
-#| fig-width: 12
-#| fig-height: 7
+```{r tuning-archives-rpf, eval=knitr::is_html_output()}
+#| fig-width: 13
+#| fig-height: 11
 #| fig-align: center
 #| message: false
 #| error: false
@@ -771,9 +848,9 @@ plot_archive(archives_rpf, "max_interaction")
 
 #### XGBoost / XGBoost (2)
 
-```{r tuning-archives-xgb}
-#| fig-width: 12
-#| fig-height: 7
+```{r tuning-archives-xgb, eval=knitr::is_html_output()}
+#| fig-width: 13
+#| fig-height: 11
 #| fig-align: center
 #| message: false
 #| error: false
@@ -790,9 +867,9 @@ plot_archive(archives_xgb, "nrounds"         , log_y = FALSE, log_x = FALSE)
 
 #### ranger
 
-```{r tuning-archives-ranger}
-#| fig-width: 12
-#| fig-height: 7
+```{r tuning-archives-ranger, eval=knitr::is_html_output()}
+#| fig-width: 13
+#| fig-height: 11
 #| fig-align: center
 #| message: false
 #| error: false
