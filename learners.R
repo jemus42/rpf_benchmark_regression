@@ -100,7 +100,7 @@ learners <- list(
     max_interaction_limit = 20,
     search_space = ps(
       max_interaction_ratio = p_dbl(0, 1),
-      splits    = p_int(10, 100),
+      splits    = p_int(10, 200),
       split_try = p_int(1, 20),
       t_try     = p_dbl(0.1, 1)
     )
@@ -114,7 +114,7 @@ learners <- list(
     ntrees = 50,
     max_interaction = 2,
     search_space = ps(
-      splits    = p_int(10, 100),
+      splits    = p_int(10, 200),
       split_try = p_int(1, 20),
       t_try     = p_dbl(0.1, 1)
     )
