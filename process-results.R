@@ -14,28 +14,6 @@ save_obj <- function(obj, name, postfix = NULL) {
   saveRDS(obj, path)
 }
 
-tictoc::tic("Full result processing")
-reg <- loadRegistry(conf$reg_dir, writeable = FALSE)
-task_meta <- readRDS("task_meta.rds")
-tab <- ljoin(unwrap(getJobTable()), task_meta, by = "task_id")
-data.table::setkey(tab, job.id)
-save_obj(tab, name = "jobs")
-
-cli::cli_h2("Processing registry")
-print(getStatus())
-ids <- findDone()
-# ids = tab[, .SD[sample(nrow(.SD), 5)], by = c("problem", "algorithm", "tags")]
-
-tictoc::tic(msg = "Reducing results")
-# Disabling the progress bar for speedup with many jobs
-options(batchtools.progress = FALSE)
-bmr <- mlr3batchmark::reduceResultsBatchmark(ids, store_backends = FALSE)
-options(batchtools.progress = TRUE)
-tictoc::toc()
-
-# Score results -------------------------------------------------------------------------------
-cli::cli_h2("Scoring and aggregating")
-
 measures <- list(
   msr("regr.rmse", id = "rmse"),
   msr("regr.mae", id = "mae"),
@@ -43,124 +21,224 @@ measures <- list(
   msr("regr.rrse", id = "rrse")
 )
 
-tictoc::tic(msg = "Scoring results")
-scores <- bmr$score(measures, conditions = TRUE)
-scores <- as.data.table(scores)
-scores[, task := NULL]
-scores[, learner := NULL]
-scores[, resampling := NULL]
-scores[, resampling_id := NULL]
-scores[, uhash := NULL]
+tictoc::tic("Full result processing")
+reg <- loadRegistry(conf$reg_dir, writeable = FALSE)
+task_meta <- readRDS("task_meta.rds")
+tab <- ljoin(unwrap(getJobTable()), task_meta, by = "task_id")
+data.table::setkey(tab, job.id)
+save_obj(tab, name = "jobs")
 
-score_errors <- sapply(scores$errors, \(x) length(x) > 0, simplify = TRUE) |> sum()
-score_warnings <- sapply(scores$warnings, \(x) length(x) > 0, simplify = TRUE) |> sum()
+cli::cli_h1("Processing registry")
+print(getStatus())
 
-if (score_errors == 0) scores[, errors := NULL]
-if (score_warnings == 0) scores[, warnings := NULL]
+
+learners = unique(tab$learner_id)
+
+
+
+for (learner in learners) {
+  cli::cli_h2("Processing results for {.val {learner}}")
+
+  if (learner == "featureless") {
+    result_types = c("scores", "aggr")
+  } else {
+    result_types = c("scores", "aggr", "archives", "results")
+  }
+
+  learner_output_files = fs::path(
+    conf$result_path,
+    paste0(result_types, "_", learner),
+    ext = "rds"
+  )
+
+  if (all(fs::file_exists(learner_output_files))) {
+    cli::cli_alert_info("Output files for {.val {learner}} already exist, skipping")
+    next
+  }
+
+  ids_all = tab[learner_id == learner, job.id]
+  ids = ijoin(findDone(), ids)
+
+  cli::cli_inform("Found {.val {nrow(ids)}} / {.val {nrow(ids_all)}} completed jobs")
+
+  tictoc::tic(msg = "Reducing results")
+  # Disabling the progress bar for speedup with many jobs
+  options(batchtools.progress = FALSE)
+  bmr <- mlr3batchmark::reduceResultsBatchmark(ids, store_backends = FALSE)
+  options(batchtools.progress = TRUE)
+  tictoc::toc()
+
+
+  cli::cli_h3("Scoring and aggregating")
+
+
+  tictoc::tic(msg = "Scoring results")
+  scores <- bmr$score(measures, conditions = TRUE)
+  scores <- as.data.table(scores)
+  scores[, task := NULL]
+  scores[, learner := NULL]
+  scores[, resampling := NULL]
+  scores[, resampling_id := NULL]
+  scores[, uhash := NULL]
+
+  scores[, errors := sapply(errors, \(x) length(x), simplify = TRUE)]
+  scores[, warnings := sapply(warnings, \(x) length(x) > 0, simplify = TRUE)]
+
+  tictoc::toc()
+
+  tictoc::tic(msg = "Aggregating results")
+  aggr <- bmr$aggregate(measures, conditions = TRUE)
+  aggr <- as.data.table(aggr)
+  aggr[, resample_result := NULL]
+  aggr[, resampling_id := NULL]
+
+  if (sum(aggr[, errors]) == 0) aggr[, errors := NULL]
+  if (sum(aggr[, warnings]) == 0) aggr[, warnings := NULL]
+  tictoc::toc()
+
+  tictoc::tic(msg = "Saving to disk: scores, aggr")
+  save_obj(scores, name = "scores", postfix = learner)
+  save_obj(aggr, name = "aggr", postfix = learner)
+  tictoc::toc()
+
+  if (learner == "featureless") next
+
+  cli::cli_h3("Extracting tuning archives and results")
+
+  tictoc::tic("Extracting and saving tuning archives")
+  tuning_archives <- extract_inner_tuning_archives(bmr, unnest = NULL)
+
+  if (startsWith(learner, "rpf")) {
+
+    archives <- tuning_archives |>
+      dplyr::filter(startsWith(learner_id, "rpf")) |>
+      dplyr::select(tidyselect::any_of(
+        c("learner_id", "experiment", "task_id", "iteration", "splits", "split_try", "t_try", "max_interaction_ratio",
+          "regr.mse", "runtime_learners", "timestamp", "warnings", "errors", "batch_nr")
+      ))
+
+    archives <- merge(archives, task_meta, by = "task_id")
+    archives[, rmse := sqrt(regr.mse)]
+
+    if (learner == "rpf_fixdepth") {
+      archives[, max_interaction := 2]
+    } else {
+      archives[, max_interaction := pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1)]
+      archives[, max_interaction_ratio := NULL]
+    }
+
+  } else if (startsWith(learner, "xgb")) {
+
+    archives <- tuning_archives |>
+      dplyr::filter(startsWith(learner_id, "xgb")) |>
+      dplyr::select(tidyselect::any_of(
+        c("learner_id", "experiment", "task_id", "iteration", "regr.xgboost.max_depth", "regr.xgboost.subsample",
+          "regr.xgboost.colsample_bytree", "regr.xgboost.eta", "regr.xgboost.nrounds", "regr.mse",
+          "runtime_learners", "timestamp", "warnings", "errors", "batch_nr")
+      ))
+
+    names_to_trim <- stringr::str_subset(names(archives), "xgb")
+    data.table::setnames(archives,
+                         old = names_to_trim,
+                         new = stringr::str_remove(names_to_trim, "^regr\\.xgboost\\."))
+
+    archives <- merge(archives, task_meta, by = "task_id")
+    archives[, rmse := sqrt(regr.mse)]
+
+    if (learner == "xgb_fixdepth") {
+      archives[, max_depth := 2]
+    }
+
+  } else if (learner == "ranger") {
+    archives <- tuning_archives[
+      learner_id == "ranger",
+      .(learner_id, experiment, task_id, iteration, mtry.ratio, min.node.size, sample.fraction,
+        regr.mse, runtime_learners, timestamp, warnings, errors, batch_nr)]
+
+    archives <- merge(archives, task_meta, by = "task_id")
+    archives[, rmse := sqrt(regr.mse)]
+    archives[, mtry := ceiling(mtry.ratio * p)]
+    archives[, mtry.ratio := NULL]
+  }
+
+  save_obj(archives, name = "archives", postfix = learner)
+  tictoc::toc()
+
+  tictoc::tic("Extracting and saving tuning results")
+  tuning_results <- extract_inner_tuning_results(bmr)
+
+  if (startsWith(learner, "rpf")) {
+    results <- tuning_results |>
+      dplyr::filter(startsWith(learner_id, "rpf")) |>
+      dplyr::select(tidyselect::any_of(
+        c("learner_id", "experiment", "task_id", "iteration", "splits", "split_try", "t_try",
+          "max_interaction_ratio", "regr.mse")
+      ))
+
+    results <- merge(results, task_meta, by = "task_id")
+    results[, rmse := sqrt(regr.mse)]
+    if (learner == "rpf_fixdepth") {
+      results[, max_interaction := 2]
+    } else {
+      results[, max_interaction := pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1)]
+      results[, max_interaction_ratio := NULL]
+    }
+
+  } else if (startsWith(learner, "xgb")) {
+    results <- tuning_results |>
+      dplyr::filter(startsWith(learner_id, "xgb")) |>
+      dplyr::select(tidyselect::any_of(
+        c("learner_id", "experiment", "task_id", "iteration", "regr.xgboost.max_depth", "regr.xgboost.subsample",
+          "regr.xgboost.colsample_bytree", "regr.xgboost.eta", "regr.xgboost.nrounds", "regr.mse")
+      ))
+
+    results[, regr.xgboost.eta := exp(regr.xgboost.eta)] # due to tuning in logscale
+
+    names_to_trim <- stringr::str_subset(names(results), "xgb")
+    data.table::setnames(
+      results,
+      old = names_to_trim,
+      new = stringr::str_remove(names_to_trim, "^regr\\.xgboost\\.")
+    )
+
+    results <- merge(results, task_meta, by = "task_id")
+    results[, rmse := sqrt(regr.mse)]
+    if (learner == "xgb_fixdepth") results[, max_depth := 2]
+
+  } else if (learner == "ranger") {
+    results <- tuning_results[
+      learner_id == "ranger",
+      .(learner_id, experiment, task_id, iteration, mtry.ratio, min.node.size, sample.fraction, regr.mse)]
+    results <- merge(results, task_meta, by = "task_id")
+    results[, rmse := sqrt(regr.mse)]
+    results[, mtry := ceiling(mtry.ratio * p)]
+    results[, mtry.ratio := NULL]
+  }
+
+  save_obj(results, name = "results", postfix = learner)
+  tictoc::toc()
+
+  rm(bmr)
+
+  tictoc::tic("Collecting garbage just in case")
+  gc(full = TRUE)
+  tictoc::toc()
+}
+
+cli::cli_h2("Combining results")
+
+tictoc::tic("Scores")
+fs::dir_ls(conf$result_path, glob = "scores_*.rds") |>
+  lapply(readRDS) |>
+  data.table::rbindlist() |>
+  save_obj(name = "scores")
 tictoc::toc()
 
-tictoc::tic(msg = "Aggregating results")
-aggr <- bmr$aggregate(measures, conditions = TRUE)
-aggr <- as.data.table(aggr)
-aggr[, resample_result := NULL]
-aggr[, resampling_id := NULL]
-
-if (sum(aggr[, errors]) == 0) aggr[, errors := NULL]
-if (sum(aggr[, warnings]) == 0) aggr[, warnings := NULL]
-tictoc::toc()
-
-tictoc::tic(msg = "Saving to disk: scores, aggr")
-save_obj(scores, name = "scores")
-save_obj(aggr, name = "aggr")
-tictoc::toc()
-
-# Extract tuning archives ---------------------------------------------------------------------
-cli::cli_h2("Extracting tuning archives and results")
-
-tictoc::tic("Extracting and saving tuning archives")
-tuning_archives <- extract_inner_tuning_archives(bmr, unnest = NULL)
-
-archives_rpf <- tuning_archives[
-  startsWith(learner_id, "rpf"),
- .(learner_id, experiment, task_id, iteration, splits, split_try, t_try, max_interaction_ratio, regr.mse,
-   runtime_learners, timestamp, warnings, errors, batch_nr)]
-
-archives_rpf <- merge(archives_rpf, task_meta, by = "task_id")
-archives_rpf[, rmse := sqrt(regr.mse)]
-archives_rpf[, max_interaction := fifelse(learner_id == "rpf", pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1), 2)]
-archives_rpf[, max_interaction_ratio := NULL]
-
-archives_xgb <- tuning_archives[
-  startsWith(learner_id, "xgb"),
-  .(learner_id, experiment, task_id, iteration, regr.xgboost.max_depth, regr.xgboost.subsample,
-    regr.xgboost.colsample_bytree, regr.xgboost.eta, regr.xgboost.nrounds, regr.mse,
-    runtime_learners, timestamp, warnings, errors, batch_nr)]
-archives_xgb[, regr.xgboost.eta := exp(regr.xgboost.eta)] # due to tuning in logscale
-
-names_to_trim <- stringr::str_subset(names(archives_xgb), "xgb")
-data.table::setnames(archives_xgb,
-                     old = names_to_trim,
-                     new = stringr::str_remove(names_to_trim, "^regr\\.xgboost\\."))
-
-archives_xgb <- merge(archives_xgb, task_meta, by = "task_id")
-archives_xgb[, rmse := sqrt(regr.mse)]
-archives_xgb[, max_depth := fifelse(is.na(max_depth), 2, max_depth)]
-
-archives_ranger <- tuning_archives[
-  learner_id == "ranger",
-  .(learner_id, experiment, task_id, iteration, mtry.ratio, min.node.size, sample.fraction,
-    regr.mse, runtime_learners, timestamp, warnings, errors, batch_nr)]
-
-archives_ranger <- merge(archives_ranger, task_meta, by = "task_id")
-archives_ranger[, rmse := sqrt(regr.mse)]
-archives_ranger[, mtry := ceiling(mtry.ratio * p)]
-archives_ranger[, mtry.ratio := NULL]
-
-save_obj(archives_rpf,    name = "archives", postfix = "rpf")
-save_obj(archives_xgb,    name = "archives", postfix = "xgb")
-save_obj(archives_ranger, name = "archives", postfix = "ranger")
-tictoc::toc()
-
-tictoc::tic("Extracting and saving tuning results")
-tuning_results <- extract_inner_tuning_results(bmr)
-
-results_rpf <- tuning_results[
-  startsWith(learner_id, "rpf"),
-  .(learner_id, experiment, task_id, iteration, splits, split_try, t_try, max_interaction_ratio, regr.mse)]
-
-results_rpf <- merge(results_rpf, task_meta, by = "task_id")
-results_rpf[, rmse := sqrt(regr.mse)]
-results_rpf[, max_interaction := fifelse(learner_id == "rpf", pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1), 2)]
-results_rpf[, max_interaction_ratio := NULL]
-
-results_xgb <- tuning_results[
-  startsWith(learner_id, "xgb"),
-  .(learner_id, experiment, task_id, iteration, regr.xgboost.max_depth, regr.xgboost.subsample,
-    regr.xgboost.colsample_bytree, regr.xgboost.eta, regr.xgboost.nrounds, regr.mse)]
-results_xgb[, regr.xgboost.eta := exp(regr.xgboost.eta)] # due to tuning in logscale
-
-names_to_trim <- stringr::str_subset(names(results_xgb), "xgb")
-data.table::setnames(
-  results_xgb,
-  old = names_to_trim,
-  new = stringr::str_remove(names_to_trim, "^regr\\.xgboost\\.")
-)
-
-results_xgb <- merge(results_xgb, task_meta, by = "task_id")
-results_xgb[, rmse := sqrt(regr.mse)]
-results_xgb[, max_depth := fifelse(is.na(max_depth), 2, max_depth)]
-
-results_ranger <- tuning_results[
-  learner_id == "ranger",
-  .(learner_id, experiment, task_id, iteration, mtry.ratio, min.node.size, sample.fraction, regr.mse)]
-results_ranger <- merge(results_ranger, task_meta, by = "task_id")
-results_ranger[, rmse := sqrt(regr.mse)]
-results_ranger[, mtry := ceiling(mtry.ratio * p)]
-results_ranger[, mtry.ratio := NULL]
-
-save_obj(results_rpf,    name = "results", postfix = "rpf")
-save_obj(results_xgb,    name = "results", postfix = "xgb")
-save_obj(results_ranger, name = "results", postfix = "ranger")
+tictoc::tic("Aggrs")
+fs::dir_ls(conf$result_path, glob = "aggr_*.rds") |>
+  lapply(readRDS) |>
+  data.table::rbindlist() |>
+  save_obj(name = "aggr")
 tictoc::toc()
 
 cli::cli_alert_success("Done!")
