@@ -4,7 +4,7 @@ library(patchwork)
 library(data.table)
 library(dplyr)
 library(kableExtra)
-
+conf <- config::get(config = "production_v1")
 set.seed(3) # Only for jitterdodge consistency in plots
 
 output_path <- here::here("paper-results")
@@ -186,17 +186,17 @@ aggr_tab <- aggr |>
 
 # Table with all 3 measures
 aggr_tab |>
-  select(learner_id, contains(toupper(c("rmse", "mae", "rrse")))) |>
+  select(learner_id, contains(toupper(c("rmse", "mae")))) |>
   arrange(desc(learner_id)) |>
   mutate(learner_id = learner_label(learner_id)) |>
   kbl(
-    col.names = c("Learner", "RMSE", "MAE", "RRSE (%)"),
+    col.names = c("Learner", "RMSE", "MAE"),
     caption = "Median [q25, q75] of scores over all datasets and outer resampling iterations",
     booktabs = TRUE,
     format = "latex"
   ) |>
   kable_styling(latex_options = c("hold_position")) |>
-  writeLines(con = fs::path(output_path, "aggr-full.tex"))
+  writeLines(con = fs::path(output_path, "aggr-rmse-mae.tex"))
 
 # Table with RRSE only, omitting featureless learner
 aggr_tab |>
