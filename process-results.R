@@ -56,7 +56,7 @@ for (learner in learners) {
     next
   }
 
-  ids_all = tab[learner_id == learner, job.id]
+  ids_all = tab[learner_id == learner]
   ids = ijoin(findDone(), ids_all)
 
   cli::cli_inform("Found {.val {nrow(ids)}} / {.val {nrow(ids_all)}} completed jobs")
