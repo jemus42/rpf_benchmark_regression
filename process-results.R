@@ -177,10 +177,12 @@ for (learner in learners) {
   save_obj(tuning_results, name = "results", postfix = learner)
   tictoc::toc()
 
-  rm(bmr)
-
   tictoc::tic("Collecting garbage just in case")
-  gc(full = TRUE)
+  gc(reset = TRUE)
+  rm(bmr, scores, aggr, tuning_archives, tuning_results)
+  memory.mult = c(if (.Machine$sizeof.pointer == 4L) 28L else 56L, 8L)
+  mem.used = sum(gc()[, 1L] * memory.mult)
+  cli::cli_alert_info("Used {.val {prettyunits::pretty_bytes(mem.used)}}")
   tictoc::toc()
 }
 
