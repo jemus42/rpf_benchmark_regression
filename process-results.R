@@ -91,9 +91,6 @@ for (learner in learners) {
   aggr <- as.data.table(aggr)
   aggr[, resample_result := NULL]
   aggr[, resampling_id := NULL]
-
-  if (sum(aggr[, errors]) == 0) aggr[, errors := NULL]
-  if (sum(aggr[, warnings]) == 0) aggr[, warnings := NULL]
   tictoc::toc()
 
   tictoc::tic(msg = "Saving to disk: scores, aggr")
@@ -228,14 +225,14 @@ for (learner in learners) {
 cli::cli_h2("Combining results")
 
 tictoc::tic("Scores")
-fs::dir_ls(conf$result_path, glob = "scores_*.rds") |>
+fs::dir_ls(conf$result_path, glob = "*/scores_*.rds") |>
   lapply(readRDS) |>
   data.table::rbindlist() |>
   save_obj(name = "scores")
 tictoc::toc()
 
 tictoc::tic("Aggrs")
-fs::dir_ls(conf$result_path, glob = "aggr_*.rds") |>
+fs::dir_ls(conf$result_path, glob = "*/aggr_*.rds") |>
   lapply(readRDS) |>
   data.table::rbindlist() |>
   save_obj(name = "aggr")
