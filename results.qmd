@@ -57,8 +57,18 @@ aggr   <- task_meta[aggr, on = c("task_id")]
 scores <- task_meta[scores, on = c("task_id")]
 
 archives_rpf <- readRDS(fs::path(conf$result_path, "archives_rpf", ext = "rds"))
+archives_rpf_fixdepth <- readRDS(fs::path(conf$result_path, "archives_rpf_fixdepth", ext = "rds"))
+archives_rpf = rbind(archives_rpf, archives_rpf_fixdepth)
+
 results_rpf <- readRDS(fs::path(conf$result_path, "results_rpf", ext = "rds"))
+results_rpf_fixdepth <- readRDS(fs::path(conf$result_path, "results_rpf_fixdepth", ext = "rds"))
+results_rpf = rbind(results_rpf, results_rpf_fixdepth)
+
+
 archives_xgb <- readRDS(fs::path(conf$result_path, "archives_xgb", ext = "rds"))
+archives_xgb_fixdepth <- readRDS(fs::path(conf$result_path, "archives_xgb_fixdepth", ext = "rds"))
+archives_xgb = rbind(archives_xgb, archives_xgb_fixdepth)
+
 archives_ranger <- readRDS(fs::path(conf$result_path, "archives_ranger", ext = "rds"))
 
 # Define learner colors for somewhat identifiable plots
