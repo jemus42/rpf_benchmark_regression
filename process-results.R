@@ -65,9 +65,7 @@ for (learner in learners) {
   options(batchtools.progress = TRUE)
   tictoc::toc()
 
-
   cli::cli_h3("Scoring and aggregating")
-
 
   tictoc::tic(msg = "Scoring results")
   scores <- bmr$score(measures, conditions = TRUE)
@@ -107,7 +105,8 @@ for (learner in learners) {
   }
   tuning_archives <- merge(tuning_archives, task_meta, by = "task_id")
   tuning_archives[, rmse := sqrt(regr.mse)]
-
+  tuning_archives[, x_domain := NULL]
+  tuning_archives[, resampling_id := NULL]
 
   if (learner == "rpf") {
     tuning_archives[, max_interaction := pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1)]
@@ -118,8 +117,8 @@ for (learner in learners) {
     tuning_archives[, max_interaction := 2]
   }
 
-
   if (startsWith(learner, "xgb")) {
+    tuning_archives[, regr.xgboost.eta := exp(regr.xgboost.eta)]
 
     names_to_trim <- stringr::str_subset(names(tuning_archives), "xgb")
     data.table::setnames(tuning_archives,
@@ -146,6 +145,8 @@ for (learner in learners) {
 
   tuning_results <- merge(tuning_results, task_meta, by = "task_id")
   tuning_results[, rmse := sqrt(regr.mse)]
+  tuning_results[, x_domain := NULL]
+  tuning_results[, resampling_id := NULL]
 
   if (learner == "rpf") {
     tuning_results[, max_interaction := pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1)]
@@ -157,8 +158,7 @@ for (learner in learners) {
   }
 
   if (startsWith(learner, "xgb")) {
-
-    tuning_results[, regr.xgboost.eta := exp(regr.xgboost.eta)] # due to tuning in logscale
+    tuning_results[, regr.xgboost.eta := exp(regr.xgboost.eta)]
 
     names_to_trim <- stringr::str_subset(names(tuning_results), "regr.xgboost")
     data.table::setnames(
