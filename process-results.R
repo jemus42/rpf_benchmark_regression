@@ -31,10 +31,7 @@ save_obj(tab, name = "jobs")
 cli::cli_h1("Processing registry")
 print(getStatus())
 
-
 learners = unique(tab$learner_id)
-
-
 
 for (learner in learners) {
   cli::cli_h2("Processing results for {.val {learner}}")
@@ -103,116 +100,81 @@ for (learner in learners) {
   cli::cli_h3("Extracting tuning archives and results")
 
   tictoc::tic("Extracting and saving tuning archives")
-  tuning_archives <- extract_inner_tuning_archives(bmr, unnest = NULL)
+  tuning_archives <- try(extract_inner_tuning_archives(bmr, unnest = NULL))
+  if (inherits(tuning_archives, "try-error")) {
+    cli::cli_alert_danger("Failed to extract tuning archives for {.val {learner}}, skipping")
+    next
+  }
+  tuning_archives <- merge(tuning_archives, task_meta, by = "task_id")
+  tuning_archives[, rmse := sqrt(regr.mse)]
 
-  if (startsWith(learner, "rpf")) {
 
-    archives <- tuning_archives |>
-      dplyr::filter(startsWith(learner_id, "rpf")) |>
-      dplyr::select(tidyselect::any_of(
-        c("learner_id", "experiment", "task_id", "iteration", "splits", "split_try", "t_try", "max_interaction_ratio",
-          "regr.mse", "runtime_learners", "timestamp", "warnings", "errors", "batch_nr")
-      ))
-
-    archives <- merge(archives, task_meta, by = "task_id")
-    archives[, rmse := sqrt(regr.mse)]
-
-    if (learner == "rpf_fixdepth") {
-      archives[, max_interaction := 2]
-    } else {
-      archives[, max_interaction := pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1)]
-      archives[, max_interaction_ratio := NULL]
-    }
-
-  } else if (startsWith(learner, "xgb")) {
-
-    archives <- tuning_archives |>
-      dplyr::filter(startsWith(learner_id, "xgb")) |>
-      dplyr::select(tidyselect::any_of(
-        c("learner_id", "experiment", "task_id", "iteration", "regr.xgboost.max_depth", "regr.xgboost.subsample",
-          "regr.xgboost.colsample_bytree", "regr.xgboost.eta", "regr.xgboost.nrounds", "regr.mse",
-          "runtime_learners", "timestamp", "warnings", "errors", "batch_nr")
-      ))
-
-    names_to_trim <- stringr::str_subset(names(archives), "xgb")
-    data.table::setnames(archives,
-                         old = names_to_trim,
-                         new = stringr::str_remove(names_to_trim, "^regr\\.xgboost\\."))
-
-    archives <- merge(archives, task_meta, by = "task_id")
-    archives[, rmse := sqrt(regr.mse)]
-
-    if (learner == "xgb_fixdepth") {
-      archives[, max_depth := 2]
-    }
-
-  } else if (learner == "ranger") {
-    archives <- tuning_archives[
-      learner_id == "ranger",
-      .(learner_id, experiment, task_id, iteration, mtry.ratio, min.node.size, sample.fraction,
-        regr.mse, runtime_learners, timestamp, warnings, errors, batch_nr)]
-
-    archives <- merge(archives, task_meta, by = "task_id")
-    archives[, rmse := sqrt(regr.mse)]
-    archives[, mtry := ceiling(mtry.ratio * p)]
-    archives[, mtry.ratio := NULL]
+  if (learner == "rpf") {
+    tuning_archives[, max_interaction := pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1)]
+    tuning_archives[, max_interaction_ratio := NULL]
   }
 
-  save_obj(archives, name = "archives", postfix = learner)
+  if (learner == "rpf_fixdepth") {
+    tuning_archives[, max_interaction := 2]
+  }
+
+
+  if (startsWith(learner, "xgb")) {
+
+    names_to_trim <- stringr::str_subset(names(tuning_archives), "xgb")
+    data.table::setnames(tuning_archives,
+                         old = names_to_trim,
+                         new = stringr::str_remove(names_to_trim, "^regr\\.xgboost\\."))
+  }
+
+  if (learner == "xgb_fixdepth") tuning_archives[, max_depth := 2]
+
+  if (learner == "ranger") {
+    tuning_archives[, mtry := ceiling(mtry.ratio * p)]
+    tuning_archives[, mtry.ratio := NULL]
+  }
+
+  save_obj(tuning_archives, name = "archives", postfix = learner)
   tictoc::toc()
 
   tictoc::tic("Extracting and saving tuning results")
-  tuning_results <- extract_inner_tuning_results(bmr)
+  tuning_results <- try(extract_inner_tuning_results(bmr))
+  if (inherits(tuning_results, "try-error")) {
+    cli::cli_alert_danger("Failed to extract tuning results for {.val {learner}}, skipping")
+    next
+  }
 
-  if (startsWith(learner, "rpf")) {
-    results <- tuning_results |>
-      dplyr::filter(startsWith(learner_id, "rpf")) |>
-      dplyr::select(tidyselect::any_of(
-        c("learner_id", "experiment", "task_id", "iteration", "splits", "split_try", "t_try",
-          "max_interaction_ratio", "regr.mse")
-      ))
+  tuning_results <- merge(tuning_results, task_meta, by = "task_id")
+  tuning_results[, rmse := sqrt(regr.mse)]
 
-    results <- merge(results, task_meta, by = "task_id")
-    results[, rmse := sqrt(regr.mse)]
-    if (learner == "rpf_fixdepth") {
-      results[, max_interaction := 2]
-    } else {
-      results[, max_interaction := pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1)]
-      results[, max_interaction_ratio := NULL]
-    }
+  if (learner == "rpf") {
+    tuning_results[, max_interaction := pmax(ceiling(max_interaction_ratio * pmin(p, 20)), 1)]
+    tuning_results[, max_interaction_ratio := NULL]
+  }
 
-  } else if (startsWith(learner, "xgb")) {
-    results <- tuning_results |>
-      dplyr::filter(startsWith(learner_id, "xgb")) |>
-      dplyr::select(tidyselect::any_of(
-        c("learner_id", "experiment", "task_id", "iteration", "regr.xgboost.max_depth", "regr.xgboost.subsample",
-          "regr.xgboost.colsample_bytree", "regr.xgboost.eta", "regr.xgboost.nrounds", "regr.mse")
-      ))
+  if (learner == "rpf_fixdepth") {
+    tuning_results[, max_interaction := 2]
+  }
 
-    results[, regr.xgboost.eta := exp(regr.xgboost.eta)] # due to tuning in logscale
+  if (startsWith(learner, "xgb")) {
 
-    names_to_trim <- stringr::str_subset(names(results), "xgb")
+    tuning_results[, regr.xgboost.eta := exp(regr.xgboost.eta)] # due to tuning in logscale
+
+    names_to_trim <- stringr::str_subset(names(tuning_results), "regr.xgboost")
     data.table::setnames(
-      results,
+      tuning_results,
       old = names_to_trim,
       new = stringr::str_remove(names_to_trim, "^regr\\.xgboost\\.")
     )
+  }
+  if (learner == "xgb_fixdepth") tuning_results[, max_depth := 2]
 
-    results <- merge(results, task_meta, by = "task_id")
-    results[, rmse := sqrt(regr.mse)]
-    if (learner == "xgb_fixdepth") results[, max_depth := 2]
-
-  } else if (learner == "ranger") {
-    results <- tuning_results[
-      learner_id == "ranger",
-      .(learner_id, experiment, task_id, iteration, mtry.ratio, min.node.size, sample.fraction, regr.mse)]
-    results <- merge(results, task_meta, by = "task_id")
-    results[, rmse := sqrt(regr.mse)]
-    results[, mtry := ceiling(mtry.ratio * p)]
-    results[, mtry.ratio := NULL]
+  if (learner == "ranger") {
+    tuning_results[, mtry := ceiling(mtry.ratio * p)]
+    tuning_results[, mtry.ratio := NULL]
   }
 
-  save_obj(results, name = "results", postfix = learner)
+  save_obj(tuning_results, name = "results", postfix = learner)
   tictoc::toc()
 
   rm(bmr)
@@ -225,17 +187,19 @@ for (learner in learners) {
 cli::cli_h2("Combining results")
 
 tictoc::tic("Scores")
-fs::dir_ls(conf$result_path, glob = "*/scores_*.rds") |>
+scores = fs::dir_ls(conf$result_path, glob = "*/scores_*.rds") |>
   lapply(readRDS) |>
-  data.table::rbindlist() |>
-  save_obj(name = "scores")
+  data.table::rbindlist()
+
+save_obj(scores, name = "scores")
 tictoc::toc()
 
 tictoc::tic("Aggrs")
-fs::dir_ls(conf$result_path, glob = "*/aggr_*.rds") |>
+aggr = fs::dir_ls(conf$result_path, glob = "*/aggr_*.rds") |>
   lapply(readRDS) |>
-  data.table::rbindlist() |>
-  save_obj(name = "aggr")
+  data.table::rbindlist()
+
+save_obj(aggr, name = "aggr")
 tictoc::toc()
 
 cli::cli_alert_success("Done!")
