@@ -36,6 +36,8 @@ library(data.table)
 library(dplyr)
 library(kableExtra)
 
+conf <- config::get(config = "production")
+
 jobs <- readRDS(fs::path(conf$result_path, "jobs", ext = "rds"))
 jobs[, time.hours := as.numeric(time.running, unit = "hours")]
 
@@ -806,9 +808,10 @@ data.table::rbindlist(
   )
 ) |>
   summarize(
+    n = n(),
     median = median(N),
     min_max = if_else(min(N) == max(N), "-", glue::glue("{min(N)} - {max(N)}")),
-    fmt = glue::glue("{median} ({min_max})"),
+    fmt = glue::glue("{median} ({n}, {min_max})"),
     .by = c("task_id", "learner_id")
   ) |>
   arrange(task_id) |>
@@ -829,7 +832,7 @@ data.table::rbindlist(
   arrange(task_label) |>
   rename(Task = task_label) |>
   kableExtra::kable(
-    caption = "Median (min - max) number of tuning evaluations per learner and task. (-) denotes a constant number of evaluations across resampling iterations."
+    caption = "Median (number of replications, min - max) number of tuning evaluations per learner and task. (-) denotes a constant number of evaluations across resampling iterations."
   ) |>
   kableExtra::kable_styling()
 ```
@@ -844,7 +847,7 @@ data.table::rbindlist(
 #| message: false
 #| error: false
 #| warning: false
-#| cache: true
+#| cache: false
 # column: screen-inset-shaded
 
 plot_archive(archives_rpf, "splits")
