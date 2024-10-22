@@ -26,6 +26,18 @@ reg <- loadRegistry(conf$reg_dir, writeable = FALSE)
 task_meta <- readRDS("task_meta.rds")
 tab <- ljoin(unwrap(getJobTable()), task_meta, by = "task_id")
 data.table::setkey(tab, job.id)
+
+cli::cli_alert_danger("Excluding failing job")
+id_bad = findExperiments(
+  prob.pars = task_id == "QSAR_fish_toxicity",
+  algo.pars = learner_id == "rpf",
+  repls = 74
+)
+# Error !any(seed_next != seed) in future.
+# See also https://github.com/HenrikBengtsson/future.apply/issues/122
+# Does not occur with updated mlr3 (needs updated mlr3mbo, mlr3tuning)
+# by accident?
+
 save_obj(tab, name = "jobs")
 
 cli::cli_h1("Processing registry")
@@ -55,6 +67,7 @@ for (learner in learners) {
 
   ids_all = tab[learner_id == learner]
   ids = ijoin(findDone(), ids_all)
+  ids = ajoin(ids, id_bad)
 
   cli::cli_inform("Found {.val {nrow(ids)}} / {.val {nrow(ids_all)}} completed jobs")
 
