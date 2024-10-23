@@ -27,16 +27,18 @@ task_meta <- readRDS("task_meta.rds")
 tab <- ljoin(unwrap(getJobTable()), task_meta, by = "task_id")
 data.table::setkey(tab, job.id)
 
-cli::cli_alert_danger("Excluding failing job")
-id_bad = findExperiments(
-  prob.pars = task_id == "QSAR_fish_toxicity",
-  algo.pars = learner_id == "rpf",
-  repls = 74
-)
-# Error !any(seed_next != seed) in future.
-# See also https://github.com/HenrikBengtsson/future.apply/issues/122
-# Does not occur with updated mlr3 (needs updated mlr3mbo, mlr3tuning)
-# by accident?
+
+runtimes <- tab[!is.na(time.running) & learner_id != "featureless",
+                .(mean_time_hours = mean(time.hours),
+                  min_time_hours = min(time.hours),
+                  max_time_hours = max(time.hours),
+                  mem.used = mean(mem.used, na.rm = TRUE)),
+                by = .(learner_id, task_id)]
+# memory measurement wasn't always enabled, so if no measurement is available
+# we just assume a reasonable default aligned with the RAM available
+# on the most common nodes on the cluster
+runtimes[, mean_mem_used := fifelse(is.nan(mem.used), 4000, mem.used)]
+save_obj(runtimes, name = "runtimes")
 
 save_obj(tab, name = "jobs")
 
@@ -63,6 +65,21 @@ for (learner in learners) {
   if (all(fs::file_exists(learner_output_files))) {
     cli::cli_alert_info("Output files for {.val {learner}} already exist, skipping")
     next
+  }
+
+  # Assemble relevant job.ids
+
+  # Error !any(seed_next != seed) in future.
+  # See also https://github.com/HenrikBengtsson/future.apply/issues/122
+  # Does not occur with updated mlr3 (needs updated mlr3mbo, mlr3tuning)
+  # by accident?
+  if (learner == "rpf") {
+    cli::cli_alert_danger("Excluding failing job")
+    id_bad = findExperiments(
+      prob.pars = task_id == "QSAR_fish_toxicity",
+      algo.pars = learner_id == "rpf",
+      repls = 74
+    )
   }
 
   ids_all = tab[learner_id == learner]

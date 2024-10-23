@@ -73,6 +73,9 @@ archives_xgb = rbind(archives_xgb, archives_xgb_fixdepth)
 
 archives_ranger <- readRDS(fs::path(conf$result_path, "archives_ranger", ext = "rds"))
 
+runtimes <- readRDS(fs::path(conf$result_path, "runtimes", ext = "rds"))
+
+
 # Define learner colors for somewhat identifiable plots
 learner_cols <- c(
   "rpf" = "#F73098",
@@ -175,20 +178,6 @@ jobs |>
     plot.title.position = "plot"
   )
 ```
-
-
-```{r}
-runtimes <- jobs[!is.na(time.running) & learner_id != "featureless", 
-     .(mean_time_hours = mean(time.hours), 
-       min_time_hours = min(time.hours),
-       max_time_hours = max(time.hours),
-       mem.used = mean(mem.used, na.rm = TRUE)), 
-     by = .(learner_id, task_id)][,
-       mean_mem_used := fifelse(is.nan(mem.used), 4096, mem.used)
-     ][]
-saveRDS(runtimes, here::here("attic", "runtimes.rds"))
-```
-
 
 ### Hyperparameter Search Spaces
 
@@ -691,7 +680,7 @@ scores_runtime |>
   )
 ```
 
-```{r, eval=FALSE}
+```{r lm, eval=FALSE}
 lm(log(time.hours) ~ n:p + learner_id, data = scores_runtime) |>
   broom::tidy(exponentiate = TRUE, conf.int = TRUE)
 
@@ -799,7 +788,7 @@ Since tuning budgets was _either_ 200 evaluations _or_ a tuning time of 6 days, 
 
 Average number of evaluations for learner and task combinations, where the average is taken across resamplings:
 
-```{r}
+```{r tuning-archives-eval-count}
 data.table::rbindlist(
   list(
     archives_rpf[, .N, by = .(learner_id, task_id, iteration)],
