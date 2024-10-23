@@ -25,8 +25,8 @@ tictoc::tic("Full result processing")
 reg <- loadRegistry(conf$reg_dir, writeable = FALSE)
 task_meta <- readRDS("task_meta.rds")
 tab <- ljoin(unwrap(getJobTable()), task_meta, by = "task_id")
+jobs[, time.hours := as.numeric(time.running, unit = "hours")]
 data.table::setkey(tab, job.id)
-
 
 runtimes <- tab[!is.na(time.running) & learner_id != "featureless",
                 .(mean_time_hours = mean(time.hours),

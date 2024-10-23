@@ -37,9 +37,7 @@ library(dplyr)
 library(kableExtra)
 
 conf <- config::get(config = "production")
-
 jobs <- readRDS(fs::path(conf$result_path, "jobs", ext = "rds"))
-jobs[, time.hours := as.numeric(time.running, unit = "hours")]
 
 # Load task metadata
 task_meta <- readRDS("task_meta.rds")
