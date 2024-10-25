@@ -227,7 +227,7 @@ task_meta |>
 
 #### Completion by task
 
-```{r}
+```{r tbl-task-completion}
 task_completion <- jobs |>
   filter(learner_id != "featureless") |>
   mutate(is_done = !is.na(time.running)) |>
@@ -248,7 +248,7 @@ task_completion |>
   kableExtra::kable_styling()
 ```
 
-```{r subset-to-completed-tasks}
+```{r tbl-task-completion-completed}
 completed_tasks <- task_completion |>
   filter(total == 1)
 
@@ -691,7 +691,7 @@ scores_runtime |>
 ```
 
 
-### Tuning Results
+### Tuning
 
 #### Effective Budgets
 
@@ -699,7 +699,7 @@ Since tuning budgets was _either_ 200 evaluations _or_ a tuning time of 6 days, 
 
 Average number of evaluations for learner and task combinations, where the average is taken across resamplings:
 
-```{r tuning-archives-eval-count}
+```{r tbl-tuning-archives-eval-count}
 data.table::rbindlist(
   list(
     archives_rpf[, .N, by = .(learner_id, task_id, iteration)],
@@ -784,6 +784,8 @@ plot_archive <- function(xdf, param, log_y = FALSE, log_x = FALSE, outlier_thres
 }
 ```
 
+#### Results
+
 Showing only the best performing parameter combinations of the inner folds, e.g. the parameters that "won".
 One plot per hyperparameter, with performance on y-axis.
 
@@ -811,7 +813,7 @@ plot_archive(results_rpf, "max_interaction")
 
 #### Winning `splits`
 
-```{r tuning-results-rpf-splits-tab}
+```{r tbl-tuning-results-rpf-splits-tab}
 results_rpf[, .(task_id, splits)][, .(median_splits = median(splits)), by = .(task_id)][task_meta, on = "task_id"] |>
   arrange(dim_rank) |>
   select(task_id, n, p, dim_rank, median_splits) |>
@@ -822,13 +824,13 @@ results_rpf[, .(task_id, splits)][, .(median_splits = median(splits)), by = .(ta
 ```
 
 
-### Tuning Archives
+#### Tuning Archives
 
 Showing all evaluated hyperparameter configurations to get an impression of the space the MBO algorithm explored.
 
 
 
-#### RPF / RPF (2)
+##### RPF / RPF (2)
 
 ```{r tuning-archives-rpf, eval=knitr::is_html_output()}
 #| fig-width: 13
@@ -846,7 +848,7 @@ plot_archive(archives_rpf, "t_try")
 plot_archive(archives_rpf, "max_interaction")
 ```
 
-#### XGBoost / XGBoost (2)
+##### XGBoost / XGBoost (2)
 
 ```{r tuning-archives-xgb, eval=knitr::is_html_output()}
 #| fig-width: 13
@@ -865,7 +867,7 @@ plot_archive(archives_xgb, "eta"             , log_y = FALSE, log_x = FALSE)
 plot_archive(archives_xgb, "nrounds"         , log_y = FALSE, log_x = FALSE)
 ```
 
-#### ranger
+##### ranger
 
 ```{r tuning-archives-ranger, eval=knitr::is_html_output()}
 #| fig-width: 13
