@@ -40,6 +40,12 @@ production:
 production_v1:
   reg_name: "production_v1"
 
+production_extra:
+  reg_name: "production_extra"
+  learner_threads: 15
+  tuning:
+    runtime: !expr  14 * 24 * 60 * 60
+
 trial:
   reg_name: "trial"
   tuning:
