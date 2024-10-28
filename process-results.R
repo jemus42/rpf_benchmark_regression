@@ -68,6 +68,8 @@ for (learner in learners) {
   }
 
   # Assemble relevant job.ids
+  ids_all = tab[learner_id == learner]
+  ids = ijoin(findDone(), ids_all)
 
   # Error !any(seed_next != seed) in future.
   # See also https://github.com/HenrikBengtsson/future.apply/issues/122
@@ -80,11 +82,8 @@ for (learner in learners) {
       algo.pars = learner_id == "rpf",
       repls = 74
     )
+    ids = ajoin(ids, id_bad)
   }
-
-  ids_all = tab[learner_id == learner]
-  ids = ijoin(findDone(), ids_all)
-  ids = ajoin(ids, id_bad)
 
   cli::cli_inform("Found {.val {nrow(ids)}} / {.val {nrow(ids_all)}} completed jobs")
 
