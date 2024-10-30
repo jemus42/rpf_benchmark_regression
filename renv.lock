@@ -1577,22 +1577,16 @@
     },
     "ranger": {
       "Package": "ranger",
-      "Version": "0.16.3",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteRepo": "ranger",
-      "RemoteUsername": "imbs-hl",
-      "RemotePkgRef": "imbs-hl/ranger@missing_values",
-      "RemoteRef": "missing_values",
-      "RemoteSha": "71c3c46d377e34580367b7770cce3ad9808496da",
+      "Version": "0.16.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
       "Requirements": [
         "Matrix",
         "R",
         "Rcpp",
         "RcppEigen"
       ],
-      "Hash": "8256a4285d5b67c69255c8ee338252f8"
+      "Hash": "d5ca3a8d00f088042ea3b638534e0f3d"
     },
     "rappdirs": {
       "Package": "rappdirs",
