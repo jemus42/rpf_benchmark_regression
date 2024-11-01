@@ -10,6 +10,9 @@ format:
     code-fold: true
     fig-align: center
     toc: true
+    theme:
+      light: flatly
+      dark: darkly
   pdf:
     documentclass: article
     fig-align: center
