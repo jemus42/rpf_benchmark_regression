@@ -32,12 +32,12 @@ runtimes <- tab[!is.na(time.running) & learner_id != "featureless",
                 .(mean_time_hours = mean(time.hours),
                   min_time_hours = min(time.hours),
                   max_time_hours = max(time.hours),
-                  mem.used = mean(mem.used, na.rm = TRUE)),
+                  mean_mem_used = mean(mem.used, na.rm = TRUE)),
                 by = .(learner_id, task_id)]
 # memory measurement wasn't always enabled, so if no measurement is available
 # we just assume a reasonable default aligned with the RAM available
 # on the most common nodes on the cluster
-runtimes[, mean_mem_used := fifelse(is.nan(mem.used), 4000, mem.used)]
+runtimes[, mean_mem_used := fifelse(is.nan(mean_mem_used), 4000, mean_mem_used)]
 save_obj(runtimes, name = "runtimes")
 
 save_obj(tab, name = "jobs")
@@ -105,7 +105,7 @@ for (learner in learners) {
   scores[, resampling_id := NULL]
   scores[, uhash := NULL]
 
-  scores[, errors := sapply(errors, \(x) length(x), simplify = TRUE)]
+  scores[, errors := sapply(errors, \(x) length(x) > 0, simplify = TRUE)]
   scores[, warnings := sapply(warnings, \(x) length(x) > 0, simplify = TRUE)]
 
   tictoc::toc()
