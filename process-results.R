@@ -71,20 +71,6 @@ for (learner in learners) {
   ids_all = tab[learner_id == learner]
   ids = ijoin(findDone(), ids_all)
 
-  # Error !any(seed_next != seed) in future.
-  # See also https://github.com/HenrikBengtsson/future.apply/issues/122
-  # Does not occur with updated mlr3 (needs updated mlr3mbo, mlr3tuning)
-  # by accident?
-  if (learner == "rpf") {
-    cli::cli_alert_danger("Excluding failing job")
-    id_bad = findExperiments(
-      prob.pars = task_id == "QSAR_fish_toxicity",
-      algo.pars = learner_id == "rpf",
-      repls = 74
-    )
-    ids = ajoin(ids, id_bad)
-  }
-
   cli::cli_inform("Found {.val {nrow(ids)}} / {.val {nrow(ids_all)}} completed jobs")
 
   tictoc::tic(msg = "Reducing results")
