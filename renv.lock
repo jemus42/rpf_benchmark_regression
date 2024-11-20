@@ -594,15 +594,7 @@
       "Package": "future.apply",
       "Version": "1.11.3",
       "Source": "Repository",
-      "Repository": "CRAN",
-      "Requirements": [
-        "R",
-        "future",
-        "globals",
-        "parallel",
-        "utils"
-      ],
-      "Hash": "0efead26b03bb60716ed29971b1953dc"
+      "Repository": "CRAN"
     },
     "generics": {
       "Package": "generics",
