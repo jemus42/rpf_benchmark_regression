@@ -22,3 +22,8 @@ resamplings
 *.bib
 *.pdf
 *.tex
+*.html
+code_submit
+*_cache
+*_files
+upload
